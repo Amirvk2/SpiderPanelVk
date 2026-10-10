@@ -2666,7 +2666,7 @@ Object.assign(I18N.fa, {
   'proxy.nav': 'پروکسی', 'proxy.protocol': 'پروتکل انتخاب‌شده', 'proxy.detectedCountry': 'کشور شناسایی‌شده', 'proxy.intro': 'آدرس و پورت پروکسی را وارد کنید؛ پنل SOCKS4، SOCKS5، HTTP و HTTPS را آزمایش می‌کند و سریع‌ترین اتصال موفق را انتخاب می‌کند. برای هر پروکسی یک اینباند TLS+WS روی دامنه پنل ساخته می‌شود.', 'proxy.inboundHint': 'ترافیک این اینباند از پروکسی انتخاب‌شده عبور می‌کند.',
   'proxy.add': 'افزودن پروکسی', 'proxy.host': 'آدرس (IP یا دامنه)', 'proxy.port': 'پورت', 'proxy.country': 'کشور (اختیاری)',
   'proxy.auth': 'نام کاربری و رمز (اختیاری)', 'proxy.authHint': 'اگر پروکسی شناسه نمی‌خواهد این بخش را باز نکنید.', 'proxy.username': 'Username', 'proxy.password': 'Password',
-  'proxy.test': 'تست اتصال', 'proxy.testing': 'در حال تست', 'proxy.save': 'ذخیره پروکسی', 'proxy.working': 'سالم ✓', 'proxy.notWorking': 'کار نمی‌کند',
+  'proxy.test': 'تست اتصال', 'proxy.testing': 'در حال تست', 'proxy.save': 'ذخیره پروکسی', 'proxy.working': 'سالم ✓', 'proxy.notWorking': 'کار نمی‌کند', 'proxy.ipTlsNameWarning': 'برای پروکسی با آدرس IP، نام میزبان گواهی بررسی نمی‌شود؛ زنجیرهٔ معتبر CA همچنان بررسی می‌شود.',
   'proxy.ping': 'پینگ', 'proxy.egress': 'IP خروجی', 'proxy.error': 'خطا', 'proxy.fillHost': 'آدرس و پورت را وارد کنید', 'proxy.testOk': 'اتصال موفق — حالا می‌توانید ذخیره کنید',
   'proxy.testFail': 'اتصال ناموفق بود', 'proxy.testFirst': 'اول «تست اتصال» را بزنید', 'proxy.saved': 'پروکسی ذخیره شد', 'proxy.count': 'پروکسی',
   'proxy.empty': 'هنوز پروکسی اضافه نشده است — دکمه «افزودن پروکسی» را بزنید',
@@ -2703,7 +2703,7 @@ Object.assign(I18N.en, {
   'proxy.nav': 'Proxies', 'proxy.protocol': 'Selected protocol', 'proxy.detectedCountry': 'Detected country', 'proxy.intro': 'Enter a proxy address and port. The panel tests SOCKS4, SOCKS5, HTTP, and HTTPS, then selects the fastest working connection. Each proxy creates a TLS+WS inbound on the panel domain.', 'proxy.inboundHint': 'Traffic on this inbound exits through the selected proxy.',
   'proxy.add': 'Add proxy', 'proxy.host': 'Host (IP or domain)', 'proxy.port': 'Port', 'proxy.country': 'Country (optional)',
   'proxy.auth': 'Username & password (optional)', 'proxy.authHint': 'Leave this collapsed if the proxy needs no credentials.', 'proxy.username': 'Username', 'proxy.password': 'Password',
-  'proxy.test': 'Test connection', 'proxy.testing': 'Testing', 'proxy.save': 'Save proxy', 'proxy.working': 'Working ✓', 'proxy.notWorking': 'Not working',
+  'proxy.test': 'Test connection', 'proxy.testing': 'Testing', 'proxy.save': 'Save proxy', 'proxy.working': 'Working ✓', 'proxy.notWorking': 'Not working', 'proxy.ipTlsNameWarning': 'For an IP-addressed proxy, the certificate hostname is not checked; the trusted CA chain is still verified.',
   'proxy.ping': 'Ping', 'proxy.egress': 'Egress IP', 'proxy.error': 'Error', 'proxy.fillHost': 'Enter the host and port', 'proxy.testOk': 'Connection OK — you can save it now',
   'proxy.testFail': 'Connection failed', 'proxy.testFirst': 'Run «Test connection» first', 'proxy.saved': 'Proxy saved', 'proxy.count': 'proxies',
   'proxy.empty': 'No proxy yet — press «Add proxy»',
@@ -5729,6 +5729,7 @@ function pxTestHtml(r) {
   return '<b style="color:' + (ok ? 'var(--green)' : 'var(--red)') + '">' +
     (ok ? '✔ ' : '✖ ') + esc(ok ? t('proxy.working') : t('proxy.notWorking')) + '</b><br>' +
     esc(t('proxy.protocol')) + ': <b dir="ltr">' + esc(r.protocol || '—') + '</b><br>' +
+    (r.tls_hostname_verified === false ? '<span style="color:#eab308">' + esc(t('proxy.ipTlsNameWarning')) + '</span><br>' : '') +
     esc(t('proxy.ping')) + ': <b dir="ltr">' + (r.ping_ms != null ? esc(String(r.ping_ms)) + ' ms' : '—') + '</b><br>' +
     esc(t('proxy.egress')) + ': <b dir="ltr">' + esc(r.egress_ip || '—') + '</b>' +
     (r.country_name ? '<br>' + esc(t('proxy.detectedCountry')) + ': <b>' + esc((r.country_flag || '') + ' ' + r.country_name) + '</b>' : '') +

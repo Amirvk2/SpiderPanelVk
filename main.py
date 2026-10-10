@@ -10087,10 +10087,23 @@ async def _http_connect(proxy: dict, address: str, port: int, tls: bool = False)
     """Open an HTTP CONNECT stream; HTTPS proxies use TLS to the proxy host."""
     import ssl as _ssl
     ssl_context = _ssl.create_default_context() if tls else None
+    tls_server_name = str(proxy.get("hostname") or "") if tls else None
+    if tls:
+        # An IP address cannot match a DNS-name certificate SAN. Keep normal CA
+        # chain validation, but for IP-literal proxy endpoints omit hostname
+        # verification and SNI; domain endpoints retain full verification.
+        tls_host = tls_server_name.strip().strip("[]").split("%", 1)[0]
+        try:
+            ipaddress.ip_address(tls_host)
+        except ValueError:
+            pass
+        else:
+            ssl_context.check_hostname = False
+            tls_server_name = None
     rdr, wtr = await asyncio.wait_for(
         asyncio.open_connection(
             proxy["hostname"], proxy["port"], ssl=ssl_context,
-            server_hostname=proxy["hostname"] if tls else None,
+            server_hostname=tls_server_name,
         ), timeout=3.5
     )
     try:
@@ -13127,13 +13140,21 @@ async def _proxy_test_connect_once(proxy: dict) -> dict:
         port = 0
     username = str(proxy.get("username") or "")
     password = str(proxy.get("password") or "")
-    result = {"protocol": protocol, "ping_ms": None, "egress_ip": "", "working": False, "error": ""}
+    result = {"protocol": protocol, "ping_ms": None, "egress_ip": "", "working": False, "error": "",
+              "tls_hostname_verified": None}
     if not host or not (1 <= port <= 65535):
         result["error"] = "host/port نامعتبر"
         return result
     if protocol not in ("socks4", "socks5", "http", "https"):
         result["error"] = "protocol نامعتبر"
         return result
+    if protocol == "https":
+        tls_host = host.strip().strip("[]").split("%", 1)[0]
+        try:
+            ipaddress.ip_address(tls_host)
+            result["tls_hostname_verified"] = False
+        except ValueError:
+            result["tls_hostname_verified"] = True
     started = time.monotonic()
     writer = None
     try:
