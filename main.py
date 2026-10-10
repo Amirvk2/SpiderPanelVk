@@ -1064,6 +1064,7 @@ async def startup():
     await _discover_public_endpoint()
     # Ensure the exact default TLS+WS inbound exists. It is the ONLY inbound
     # served by the FastAPI /ws/{uuid} relay.
+    retired_http_ws = False
     async with INBOUNDS_LOCK:
         default_iid = find_default_tls_ws_inbound_id()
         if not default_iid:
@@ -1093,37 +1094,32 @@ async def startup():
                 ib["external_domain"] = ""
                 ib["external_port"] = ""
                 ib.setdefault("ws_settings", {"path": "/ws/{uuid}"})
-        # A separate cleartext WebSocket endpoint is available for providers
-        # that expose plain HTTP WebSocket upgrades on port 80. Its path never
-        # overlaps the managed TLS+WS relay.
-        http_iid = find_default_http_ws_inbound_id()
-        if not http_iid:
-            http_iid = "default-http-ws" if "default-http-ws" not in INBOUNDS else generate_short_id()
-            INBOUNDS[http_iid] = {
-                "name": DEFAULT_HTTP_WS_INBOUND_NAME,
-                "_managed_kind": "default_http_ws",
-                "protocol": "vless", "inbound_type": "transport", "port": 80,
-                "network": "ws", "security": "none",
-                "domain": _safe_host(SETTINGS.get("domain"), get_host()),
-                "external_domain": "", "external_port": "", "sni": "",
-                "fingerprint": "chrome", "ws_settings": {"path": "/http-ws/{uuid}"},
-                "reality_settings": {}, "xhttp_settings": {}, "grpc_settings": {},
-                "created_at": datetime.now().isoformat(),
-            }
-            asyncio.create_task(save_state())
-            log_activity("inbound", f"اینباند {DEFAULT_HTTP_WS_INBOUND_NAME} ساخته شد", "ok")
-        else:
-            http_ib = INBOUNDS[http_iid]
-            http_ib.setdefault("_managed_kind", "default_http_ws")
-            if not http_ib.get("advanced_customized"):
-                http_ib.update({
-                    "name": DEFAULT_HTTP_WS_INBOUND_NAME,
-                    "protocol": "vless", "inbound_type": "transport", "port": 80,
-                    "network": "ws", "security": "none",
-                    "domain": _safe_host(http_ib.get("domain"), SETTINGS.get("domain"), get_host()),
-                    "external_domain": "", "external_port": "",
-                })
-                http_ib.setdefault("ws_settings", {"path": "/http-ws/{uuid}"})
+        # Retire the old managed cleartext HTTP+WS default. Users that selected
+        # it are moved to the managed TLS+WS inbound so their links keep working.
+        retired_http_ids = {
+            iid for iid, ib in INBOUNDS.items()
+            if str(ib.get("_managed_kind") or "") == "default_http_ws"
+            or str(ib.get("name") or "").strip() == LEGACY_HTTP_WS_INBOUND_NAME
+        }
+        if retired_http_ids:
+            for user in USERS.values():
+                selected = list(user.get("inbound_ids") or [])
+                if not selected and user.get("inbound_id"):
+                    selected = [user.get("inbound_id")]
+                if not any(iid in retired_http_ids for iid in selected):
+                    continue
+                selected = [iid for iid in selected if iid not in retired_http_ids]
+                if default_iid and default_iid not in selected:
+                    selected.append(default_iid)
+                user["inbound_ids"] = selected
+                if user.get("inbound_id") in retired_http_ids or user.get("inbound_id") not in selected:
+                    user["inbound_id"] = selected[0] if selected else None
+                if str(user.get("path") or "").startswith("/http-ws/"):
+                    user["path"] = f"/ws/{user.get('config_uuid') or ''}"
+            for iid in retired_http_ids:
+                INBOUNDS.pop(iid, None)
+            retired_http_ws = True
+            log_activity("inbound", "اینباند پیش‌فرض HTTP + WS حذف شد", "info")
         # Auto-create a default Reality+xhttp inbound (needs real Xray to serve)
         has_reality = any(
             ib.get("network") == "xhttp" and ib.get("protocol") == "reality"
@@ -1222,7 +1218,8 @@ async def startup():
             asyncio.create_task(save_state())
             log_activity("inbound", "اینباند پیش‌فرض Worker ساخته شد", "ok")
 
-    if normalize_relay_links():
+    relay_links_changed = normalize_relay_links()
+    if retired_http_ws or relay_links_changed:
         await save_state()
 
     # External proxies (PROXY tab): each active proxy must own its TLS+WS path
@@ -1231,6 +1228,8 @@ async def startup():
     for _pid, _p in list(PROXIES.items()):
         if _p.get("active"):
             await _ensure_proxy_inbound(_p)
+    if any(not p.get("protocol_detected") for p in PROXIES.values()):
+        asyncio.create_task(_migrate_proxy_protocols(), name="spider-proxy-protocol-migration")
     _px_repaired = 0
     async with LINKS_LOCK:
         for _uid, _u in USERS.items():
@@ -2182,7 +2181,7 @@ def _safe_host(*candidates: str) -> str:
 
 
 DEFAULT_TLS_WS_INBOUND_NAME = "پیش‌فرض TLS + WS"
-DEFAULT_HTTP_WS_INBOUND_NAME = "پیش‌فرض HTTP + WS"
+LEGACY_HTTP_WS_INBOUND_NAME = "پیش‌فرض HTTP + WS"
 LEGACY_TLS_WS_NAMES = {"VLESS+WS پیش‌فرض", "VLESS + WS پیش‌فرض", "پیش‌فرض VLESS+WS", "پیش‌فرض VLESS + WS"}
 
 
@@ -2196,26 +2195,16 @@ def is_default_tls_ws_inbound(inbound: dict | None) -> bool:
                  or str(inbound.get("name") or "").strip() == DEFAULT_TLS_WS_INBOUND_NAME))
 
 
-def is_default_http_ws_inbound(inbound: dict | None) -> bool:
-    if not inbound:
-        return False
-    return (str(inbound.get("protocol") or "").lower() == "vless"
-            and str(inbound.get("network") or "").lower() == "ws"
-            and str(inbound.get("security") or "").lower() == "none"
-            and (str(inbound.get("_managed_kind") or "") == "default_http_ws"
-                 or str(inbound.get("name") or "").strip() == DEFAULT_HTTP_WS_INBOUND_NAME))
-
-
 def _is_panel_relay_inbound(iid: str, ib: dict | None) -> bool:
     """True when the FastAPI relay itself accepts traffic for this inbound.
 
-    Covers the two managed TLS/WS inbounds and the Worker-tab Tunnel and
-    Reverse inbounds. Proxy-managed inbounds have their own per-proxy links.
+    Covers the managed TLS/WS inbound and the Worker-tab Tunnel and Reverse
+    inbounds. Proxy-managed inbounds have their own per-proxy links.
     Reality/Xray and Telegram inbounds are NOT served by the relay.
     """
     if not ib:
         return False
-    if is_default_tls_ws_inbound(ib) or is_default_http_ws_inbound(ib):
+    if is_default_tls_ws_inbound(ib):
         return True
     return str(ib.get("protocol") or "").lower() in ("tunnel", "reverse")
 
@@ -2239,17 +2228,6 @@ def find_default_tls_ws_inbound_id() -> str | None:
     return None
 
 
-def find_default_http_ws_inbound_id() -> str | None:
-    for iid, ib in INBOUNDS.items():
-        if str(ib.get("_managed_kind") or "") == "default_http_ws":
-            return iid
-    for iid, ib in INBOUNDS.items():
-        if is_default_http_ws_inbound(ib):
-            ib.setdefault("_managed_kind", "default_http_ws")
-            return iid
-    return None
-
-
 def _url_authority_host(host: str) -> str:
     """Wrap IPv6 addresses in brackets when building URI authorities."""
     value = str(host or "").strip()
@@ -2265,7 +2243,6 @@ def _url_authority_host(host: str) -> str:
 
 def normalize_relay_links() -> int:
     default_iid = find_default_tls_ws_inbound_id()
-    http_iid = find_default_http_ws_inbound_id()
     changed = 0
     for uid, user in USERS.items():
         cuuid = user.get("config_uuid") or uid
@@ -2274,10 +2251,10 @@ def normalize_relay_links() -> int:
             inbound_ids = [user.get("inbound_id")]
         primary = user.get("inbound_id") or (inbound_ids[0] if inbound_ids else None)
         # Relay is enabled for any selected inbound the FastAPI relay serves:
-        # the managed TLS+WS / HTTP+WS inbounds and the Worker tab's Tunnel and
-        # Reverse inbounds (each with its own path namespace).
+        # the managed TLS+WS inbound and the Worker tab's Tunnel and Reverse
+        # inbounds (each with its own path namespace).
         relay_ids = [iid for iid in inbound_ids if _is_panel_relay_inbound(iid, INBOUNDS.get(iid))]
-        relay_ids.sort(key=lambda i: 0 if i in (default_iid, http_iid) else 1)
+        relay_ids.sort(key=lambda i: 0 if i == default_iid else 1)
         relay = bool(relay_ids)
         link = LINKS.get(cuuid)
         if link is None:
@@ -2424,8 +2401,8 @@ def _spoof_payload(fake_sni: str, spoof_ip: str) -> str:
 def _ws_fingerprint(is_default_tls_ws: bool) -> str:
     """F+F runs with `unsafe` so the fragmented handshake is not fingerprinted.
 
-    Only the default TLS+WS inbound carries the F+F option; every other inbound
-    keeps the normal chrome fingerprint.
+    The default TLS+WS inbound and managed proxy inbounds share these options;
+    other inbounds keep the normal chrome fingerprint.
     """
     if is_default_tls_ws and SETTINGS.get("default_tls_ws_ff_enabled"):
         return "unsafe"
@@ -2457,7 +2434,7 @@ def _default_tls_ws_feature_params() -> str:
 def _default_ws_address(ib: dict | None, fallback: str) -> str:
     """Resolve the connect address while keeping the TLS host/SNI independent."""
     override = str(SETTINGS.get("default_tls_ws_address_override") or "").strip()
-    if is_default_tls_ws_inbound(ib) and override:
+    if (is_default_tls_ws_inbound(ib) or bool((ib or {}).get("proxy_managed"))) and override:
         return override
     return fallback
 
@@ -2824,13 +2801,13 @@ def generate_user_config(user_id: str, user: dict, inbound_id: str = None, addr:
         tun_rem = quote(f"Spider-{username} Tunnel".strip())
         return f"vless://{config_uuid}@{panel_domain}:443?{params}#{tun_rem}"
 
-    # The managed TLS+WS relay has a configurable connect address, while Host/SNI
-    # stay on the panel's domain. The HTTP+WS default uses a separate public path.
+    # The managed TLS+WS relay and proxy inbounds can share a configurable
+    # connect address while keeping Host/SNI on the panel's current domain.
     if str((inbound or {}).get("proxy_id") or "").strip():
         # Proxy inbounds always use the panel's current hostname. The saved
         # inbound metadata can predate a domain change.
         panel_domain = _safe_host(SETTINGS.get("domain"), get_host())
-        host = addr_ip or panel_domain
+        host = addr_ip or _default_ws_address(inbound, panel_domain)
         port = addr_port or "443"
         transport = "ws"
         security = "tls"
@@ -2841,13 +2818,6 @@ def generate_user_config(user_id: str, user: dict, inbound_id: str = None, addr:
         port = addr_port or "443"
         transport = "ws"
         security = "tls"
-        tls_host = panel_domain
-    elif is_default_http_ws_inbound(inbound):
-        panel_domain = _safe_host(SETTINGS.get("domain"), get_host())
-        host = addr_ip or _safe_host((inbound or {}).get("domain"), panel_domain)
-        port = addr_port or str((inbound or {}).get("external_port") or (inbound or {}).get("port") or 80)
-        transport = "ws"
-        security = "none"
         tls_host = panel_domain
     else:
         inbound_domain = str((inbound or {}).get("external_domain") or (inbound or {}).get("domain") or "").strip()
@@ -2903,18 +2873,11 @@ def generate_user_config(user_id: str, user: dict, inbound_id: str = None, addr:
             ws_path = configured_path.replace("{uuid}", config_uuid)
             if not ws_path.startswith("/"):
                 ws_path = "/" + ws_path
-        if is_default_http_ws_inbound(inbound):
-            ws_path_template = str(((inbound or {}).get("ws_settings") or {}).get("path") or "/http-ws/{uuid}")
-            ws_path = ws_path_template.replace("{uuid}", config_uuid)
-            if not ws_path.startswith("/"):
-                ws_path = "/" + ws_path
-            params = (f"encryption=none&security=none&type=ws"
-                      f"&host={quote(tls_host, safe='')}&path={quote(ws_path, safe='')}")
-        else:
-            params = (f"encryption=none&security={security}&type=ws"
-                      f"&host={quote(tls_host, safe='')}&path={quote(ws_path, safe='')}&sni={quote(tls_host, safe='')}"
-                      f"&fp={_ws_fingerprint(is_default_tls_ws_inbound(inbound))}&alpn=http/1.1")
-    if is_default_tls_ws_inbound(inbound):
+        is_tls_ws_default_or_proxy = is_default_tls_ws_inbound(inbound) or bool((inbound or {}).get("proxy_managed"))
+        params = (f"encryption=none&security={security}&type=ws"
+                  f"&host={quote(tls_host, safe='')}&path={quote(ws_path, safe='')}&sni={quote(tls_host, safe='')}"
+                  f"&fp={_ws_fingerprint(is_tls_ws_default_or_proxy)}&alpn=http/1.1")
+    if is_default_tls_ws_inbound(inbound) or bool((inbound or {}).get("proxy_managed")):
         params += _default_tls_ws_feature_params()
     return f"vless://{config_uuid}@{_url_authority_host(host)}:{port}?{params}#{remark}"
 
@@ -4164,7 +4127,7 @@ async def get_stats(_=Depends(require_auth)):
 # ── Activity Logs ─────────────────────────────────────────────────────────────
 @app.get("/api/activity")
 async def get_activity(_=Depends(require_auth)):
-    return {"logs": list(activity_logs)[-150:]}
+    return {"logs": list(activity_logs)[-50:]}
 
 @app.get("/api/logs")
 async def get_panel_logs(request: Request, _=Depends(require_auth)):
@@ -4726,11 +4689,6 @@ async def ws_uuid_handler(ws: WebSocket, uuid: str):
     await websocket_tunnel(ws, uuid, expected_relay_inbound_id=find_default_tls_ws_inbound_id())
 
 
-@app.websocket("/http-ws/{uuid}")
-async def http_ws_uuid_handler(ws: WebSocket, uuid: str):
-    await websocket_tunnel(ws, uuid, expected_relay_inbound_id=find_default_http_ws_inbound_id())
-
-
 # Tunnel path: /tunnel/{uuid} — user → Railway (here) → Cloudflare Worker → site.
 # Railway accepts the client's TLS+WS, then relays raw VLESS bytes to the Worker
 # over an outbound WSS connection to /{uuid} on the worker domain. The Worker
@@ -4770,7 +4728,7 @@ async def managed_ws_template_handler(ws: WebSocket, path: str):
         await websocket_tunnel(ws, px_match.group(2), expected_relay_inbound_id=proxy_inbound_id(px_match.group(1)))
         return
     for inbound_id, inbound in INBOUNDS.items():
-        if not (is_default_tls_ws_inbound(inbound) or is_default_http_ws_inbound(inbound)):
+        if not is_default_tls_ws_inbound(inbound):
             continue
         template = str(((inbound.get("ws_settings") or {}).get("path") or "")).strip()
         if "{uuid}" not in template:
@@ -5744,9 +5702,8 @@ async def create_user(request: Request, auth=Depends(require_replication_auth)):
         primary_inbound_network = (primary_inbound.get("network") if primary_inbound else "").lower()
         worker_selected = any(((INBOUNDS.get(iid) or {}).get("protocol") or "").lower() == "worker" for iid in inbound_ids)
         relay_default_id = find_default_tls_ws_inbound_id()
-        relay_http_id = find_default_http_ws_inbound_id()
         relay_inbound_ids = [iid for iid in inbound_ids if _is_panel_relay_inbound(iid, INBOUNDS.get(iid))]
-        relay_inbound_ids.sort(key=lambda i: 0 if i in (relay_default_id, relay_http_id) else 1)
+        relay_inbound_ids.sort(key=lambda i: 0 if i == relay_default_id else 1)
         relay_enabled = bool(relay_inbound_ids)
 
         if primary_inbound_proto == "worker" or worker_selected:
@@ -5770,10 +5727,6 @@ async def create_user(request: Request, auth=Depends(require_replication_auth)):
         if relay_default_id and relay_default_id in relay_inbound_ids:
             # Preserve the legacy TLS route when a user selected both managed WS defaults.
             path = f"/ws/{config_uuid}"
-        elif relay_http_id and relay_http_id in relay_inbound_ids:
-            http_path_template = str(((INBOUNDS.get(relay_http_id) or {}).get("ws_settings") or {}).get("path") or "/http-ws/{uuid}")
-            path = http_path_template.replace("{uuid}", config_uuid)
-
         proxy_bindings = {}
         for _iid in inbound_ids:
             _ib = INBOUNDS.get(_iid) or {}
@@ -6079,10 +6032,9 @@ async def edit_user(user_id: str, request: Request, _=Depends(require_auth)):
 
         # Keep the relay link exactly in sync with the selected inbound list.
         _relay_iid = find_default_tls_ws_inbound_id()
-        _relay_http_iid = find_default_http_ws_inbound_id()
         _selected_iids = list(u.get("inbound_ids") or [])
         _relay_ids = [iid for iid in _selected_iids if _is_panel_relay_inbound(iid, INBOUNDS.get(iid))]
-        _relay_ids.sort(key=lambda i: 0 if i in (_relay_iid, _relay_http_iid) else 1)
+        _relay_ids.sort(key=lambda i: 0 if i == _relay_iid else 1)
         _relay_on = bool(_relay_ids)
         _link = LINKS.get(u.get("config_uuid"))
         if _link is not None:
@@ -6096,10 +6048,6 @@ async def edit_user(user_id: str, request: Request, _=Depends(require_auth)):
                 if _relay_iid and _relay_iid in _relay_ids:
                     _link["path"] = f"/ws/{u.get('config_uuid')}"
                     u["path"] = f"/ws/{u.get('config_uuid')}"
-                elif _relay_http_iid and _relay_http_iid in _relay_ids:
-                    _http_path = str(((INBOUNDS.get(_relay_http_iid) or {}).get("ws_settings") or {}).get("path") or "/http-ws/{uuid}").replace("{uuid}", str(u.get("config_uuid")))
-                    _link["path"] = _http_path
-                    u["path"] = _http_path
     if new_proxy_links or stale_proxy_config_uuids:
         async with LINKS_LOCK:
             for _cfg in stale_proxy_config_uuids:
@@ -8674,7 +8622,14 @@ async def _race_proxy_candidates(
         except Exception:
             pass
 
-        # Raw ZEUS-style VLESS relay fallback.
+        # Auto-detected proxy records must use their selected protocol only;
+        # a raw VLESS frame is not a valid fallback for a normal proxy port.
+        if proxy.get("protocol_explicit"):
+            elapsed = (time.perf_counter() - started) * 1000.0
+            await _relay_record_proxy_result(proxy, elapsed, False)
+            return None
+
+        # Raw ZEUS-style VLESS relay fallback for legacy untyped proxy pools.
         rwtr = None
         try:
             rrdr, rwtr = await asyncio.wait_for(
@@ -8895,7 +8850,6 @@ async def websocket_tunnel(ws: WebSocket, uuid: str, proxy_override: str = None,
         link = m.LINKS.get(uuid)
 
     default_relay_id = find_default_tls_ws_inbound_id()
-    default_http_id = find_default_http_ws_inbound_id()
     expected_relay_inbound_id = expected_relay_inbound_id or default_relay_id
 
     # External-proxy path: /px/{proxy_id}/{uuid}. The inbound owns the namespace
@@ -8928,7 +8882,6 @@ async def websocket_tunnel(ws: WebSocket, uuid: str, proxy_override: str = None,
                 relay_inbound_ids.append(expected_relay_inbound_id)
         expected_is_managed = bool(
             (expected_relay_inbound_id == default_relay_id and is_default_tls_ws_inbound(relay_inbound))
-            or (expected_relay_inbound_id == default_http_id and is_default_http_ws_inbound(relay_inbound))
             or str((relay_inbound or {}).get("protocol") or "").lower() in ("tunnel", "reverse")
         )
         relay_allowed = bool(
@@ -9784,6 +9737,7 @@ def get_live_stats() -> dict:
     tcp_connections, udp_connections = conn_count, 0
     public_ipv4 = str(SETTINGS.get("server_ip") or "").strip()
     public_ipv6 = ""
+    net_sent_bytes = net_recv_bytes = 0
     try:
         import psutil as _ps
         cpu_pct = round(_ps.cpu_percent(interval=0.3), 1)
@@ -9831,6 +9785,8 @@ def get_live_stats() -> dict:
         except Exception:
             pass
         net = _ps.net_io_counters()
+        net_sent_bytes = int(net.bytes_sent)
+        net_recv_bytes = int(net.bytes_recv)
         net_sent_mb = round(net.bytes_sent / (1024**2), 2)
         net_recv_mb = round(net.bytes_recv / (1024**2), 2)
         network_mbps = round(max((net.bytes_sent + net.bytes_recv) / (1024**2) / max(uptime_secs(), 1) * 8, 0.5), 2)
@@ -9844,6 +9800,7 @@ def get_live_stats() -> dict:
         disk_total_gb = 50
         net_sent_mb = 0
         net_recv_mb = 0
+        net_sent_bytes = net_recv_bytes = 0
         network_mbps = 2.5
         tcp_connections, udp_connections = conn_count, 0
     # Calculate total traffic from all users
@@ -9862,6 +9819,8 @@ def get_live_stats() -> dict:
         "disk_used_gb": disk_used_gb,
         "disk_total_gb": disk_total_gb,
         "network_mbps": network_mbps,
+        "net_sent_bytes": net_sent_bytes,
+        "net_recv_bytes": net_recv_bytes,
         "net_sent_mb": net_sent_mb,
         "net_recv_mb": net_recv_mb,
         "net_total_mb": round(net_sent_mb + net_recv_mb, 2),
@@ -9960,6 +9919,7 @@ def _parse_proxy_entry(entry: str) -> dict | None:
     """
     import base64 as _b64
     import re as _re
+    from urllib.parse import unquote as _unquote
 
     if not entry:
         return None
@@ -9967,6 +9927,7 @@ def _parse_proxy_entry(entry: str) -> dict | None:
     # Strip leading protocol
     proto = "http"
     m = _re.match(r"^(socks5|socks4|http|https|turn|sstp)://", e, _re.I)
+    protocol_explicit = bool(m)
     if m:
         proto = m.group(1).lower()
         e = e[m.end():]
@@ -9988,16 +9949,17 @@ def _parse_proxy_entry(entry: str) -> dict | None:
                 a = authpart
         if ":" in a:
             username, password = a.split(":", 1)
+            username, password = _unquote(username), _unquote(password)
         else:
             return None
     if hostpart.startswith("["):
         # IPv6 [::1]:port
         if "]:" in hostpart:
             h, _, rest = hostpart.partition("]:")
-            hostname = h + "]"
+            hostname = h[1:]
             pport = rest.strip()
         else:
-            hostname, pport = hostpart, ""
+            hostname, pport = hostpart[1:-1], ""
     elif ":" in hostpart:
         hostname, _, pport = hostpart.rpartition(":")
     else:
@@ -10008,7 +9970,8 @@ def _parse_proxy_entry(entry: str) -> dict | None:
         return None
     if not hostname:
         return None
-    return {"protocol": proto, "username": username, "password": password,
+    return {"protocol": proto, "protocol_explicit": protocol_explicit,
+            "username": username, "password": password,
             "hostname": hostname, "port": port}
 
 
@@ -10037,6 +10000,8 @@ async def _socks5_connect(proxy: dict, address: str, port: int):
                 raise ConnectionError("socks5 requires auth")
             ub = proxy["username"].encode()
             pb = proxy["password"].encode()
+            if len(ub) > 255 or len(pb) > 255:
+                raise ConnectionError("socks5 credentials exceed 255 bytes")
             wtr.write(bytes([0x01, len(ub)]) + ub + bytes([len(pb)]) + pb)
             await wtr.drain()
             auth = await asyncio.wait_for(rdr.readexactly(2), timeout=4.0)
@@ -10086,10 +10051,47 @@ async def _socks5_connect_send(proxy: dict, address: str, port: int, rdr, wtr, _
         raise
 
 
-async def _http_connect(proxy: dict, address: str, port: int, tls: bool = False):
-    """HTTP CONNECT through the proxy, mirroring the worker's httpConnect."""
+async def _socks4_connect(proxy: dict, address: str, port: int):
+    """Open a SOCKS4/SOCKS4a CONNECT stream (SOCKS4 has no password auth)."""
+    import socket as _sock
+    host = str(address or "").strip()
+    try:
+        address_bytes = _sock.inet_aton(host)
+        domain = ""
+    except OSError:
+        if ":" in host:
+            raise ConnectionError("SOCKS4 does not support IPv6 destinations")
+        domain = host.encode("idna")
+        if not domain or len(domain) > 255:
+            raise ConnectionError("invalid SOCKS4a destination")
+        address_bytes = b"\x00\x00\x00\x01"
+    user_id = str(proxy.get("username") or "").encode()[:255]
+    packet = (b"\x04\x01" + int(port).to_bytes(2, "big") + address_bytes
+              + user_id + b"\x00" + (domain + b"\x00" if domain else b""))
     rdr, wtr = await asyncio.wait_for(
-        asyncio.open_connection(proxy["hostname"], proxy["port"]), timeout=4.0
+        asyncio.open_connection(proxy["hostname"], proxy["port"]), timeout=3.5
+    )
+    try:
+        wtr.write(packet)
+        await wtr.drain()
+        resp = await asyncio.wait_for(rdr.readexactly(8), timeout=3.5)
+        if resp[0] not in (0, 4) or resp[1] != 90:
+            raise ConnectionError(f"SOCKS4 connect failed code={resp[1]}")
+        return rdr, wtr
+    except BaseException:
+        await _close_writer_safely(wtr)
+        raise
+
+
+async def _http_connect(proxy: dict, address: str, port: int, tls: bool = False):
+    """Open an HTTP CONNECT stream; HTTPS proxies use TLS to the proxy host."""
+    import ssl as _ssl
+    ssl_context = _ssl.create_default_context() if tls else None
+    rdr, wtr = await asyncio.wait_for(
+        asyncio.open_connection(
+            proxy["hostname"], proxy["port"], ssl=ssl_context,
+            server_hostname=proxy["hostname"] if tls else None,
+        ), timeout=3.5
     )
     try:
         host_header = f"[{address}]" if ":" in address else address
@@ -10103,14 +10105,13 @@ async def _http_connect(proxy: dict, address: str, port: int, tls: bool = False)
                f"User-Agent: Mozilla/5.0\r\nConnection: keep-alive\r\n\r\n")
         wtr.write(req.encode())
         await wtr.drain()
-        status = await asyncio.wait_for(rdr.readline(), timeout=4.0)
-        # Skip headers
+        status = await asyncio.wait_for(rdr.readline(), timeout=3.5)
         while True:
-            line = await asyncio.wait_for(rdr.readline(), timeout=8.0)
+            line = await asyncio.wait_for(rdr.readline(), timeout=3.5)
             if line in (b"\r\n", b"\n", b""):
                 break
         if not re.search(rb"HTTP/\d\.\d 200", status):
-            raise ConnectionError(f"http connect failed {status.decode().strip()}")
+            raise ConnectionError(f"http connect failed {status.decode(errors='ignore').strip()}")
         return rdr, wtr
     except BaseException:
         await _close_writer_safely(wtr)
@@ -10329,43 +10330,51 @@ async def proxy_connect(
     return reader, writer
 
 
-def _order_for(proto: str):
-    if proto in ("socks5", "socks4"):
-        return ["socks5", "http"]
-    return ["http", "socks5"]
+def _order_for(proto: str, protocol_explicit: bool = False):
+    proto = str(proto or "http").lower()
+    if protocol_explicit:
+        return [proto]
+    if proto == "http":
+        return ["http", "https", "socks5", "socks4"]
+    return [proto, "http", "https", "socks5", "socks4"]
+
 
 def _proxy_entry_string(proxy: dict) -> str:
-    """One-line proxy entry the relay stores understand (user:pass@host:port)."""
+    """One-line protocol-specific proxy entry consumed by the relay."""
     if not proxy:
         return ""
     host = str(proxy.get("host") or proxy.get("hostname") or "").strip()
     port = str(proxy.get("port") or "").strip()
     if not host or not port:
         return ""
+    if ":" in host and not (host.startswith("[") and host.endswith("]")):
+        host = f"[{host}]"
     cred = ""
     user = str(proxy.get("username") or "").strip()
     pw = str(proxy.get("password") or "")
     if user:
         cred = f"{quote(user, safe='')}:{quote(pw, safe='')}@" if pw else f"{quote(user, safe='')}@"
-    return f"{cred}{host}:{port}"
+    protocol = str(proxy.get("protocol") or "http").lower()
+    if protocol not in ("socks4", "socks5", "http", "https"):
+        protocol = "http"
+    return f"{protocol}://{cred}{host}:{port}"
 
 
 async def _try_proxy_order(proxy, address, port):
     for protocol in _order_for(
-        proxy.get("protocol", "http")
+        proxy.get("protocol", "http"), bool(proxy.get("protocol_explicit"))
     ):
         try:
-            if protocol == "socks5":
-                reader, writer = await _socks5_connect(
-                    proxy, address, port
+            if protocol == "socks4":
+                reader, writer = await _socks4_connect(proxy, address, port)
+            elif protocol == "socks5":
+                reader, writer = await _socks5_connect(proxy, address, port)
+            elif protocol in ("http", "https"):
+                reader, writer = await _http_connect(
+                    proxy, address, port, tls=(protocol == "https")
                 )
             else:
-                reader, writer = await _http_connect(
-                    proxy,
-                    address,
-                    port,
-                    tls=(proxy.get("protocol") == "https"),
-                )
+                continue
             _tune_relay_socket(writer)
             return reader, writer
         except Exception:
@@ -13109,89 +13118,155 @@ async def _resolve_egress_ip() -> str:
     return ""
 
 async def _proxy_test_connect_once(proxy: dict) -> dict:
-    """Open a real connection THROUGH the proxy and report ping, egress IP, and status."""
-    protocol = str(proxy.get("protocol") or "http").lower()
+    """Probe one explicit proxy protocol through an actual HTTP request."""
+    protocol = str(proxy.get("protocol") or "").lower()
     host = str(proxy.get("host") or "").strip()
-    port = int(proxy.get("port") or 0)
+    try:
+        port = int(proxy.get("port") or 0)
+    except (TypeError, ValueError):
+        port = 0
     username = str(proxy.get("username") or "")
     password = str(proxy.get("password") or "")
-    result = {"ping_ms": None, "egress_ip": "", "working": False, "error": ""}
+    result = {"protocol": protocol, "ping_ms": None, "egress_ip": "", "working": False, "error": ""}
     if not host or not (1 <= port <= 65535):
         result["error"] = "host/port نامعتبر"
         return result
-    t0 = time.monotonic()
+    if protocol not in ("socks4", "socks5", "http", "https"):
+        result["error"] = "protocol نامعتبر"
+        return result
+    started = time.monotonic()
+    writer = None
     try:
-        proxy_dict = {"protocol": protocol, "hostname": host, "port": port, "username": username, "password": password}
-        if protocol in ("socks5", "socks4"):
-            reader, writer = await asyncio.wait_for(
-                _socks5_connect(proxy_dict, "api.ipify.org", 80),
-                timeout=8,
-            )
-        else:
-            reader, writer = await asyncio.wait_for(
-                _http_connect(proxy_dict, "api.ipify.org", 80),
-                timeout=8,
-            )
-        ping = round((time.monotonic() - t0) * 1000, 1)
-        result["ping_ms"] = ping
+        proxy_dict = {"protocol": protocol, "hostname": host, "port": port,
+                      "username": username, "password": password}
+        async def open_tunnel():
+            if protocol == "socks4":
+                return await _socks4_connect(proxy_dict, "api.ipify.org", 80)
+            if protocol == "socks5":
+                return await _socks5_connect(proxy_dict, "api.ipify.org", 80)
+            return await _http_connect(proxy_dict, "api.ipify.org", 80, tls=(protocol == "https"))
+        reader, writer = await asyncio.wait_for(open_tunnel(), timeout=5.0)
+        result["ping_ms"] = round((time.monotonic() - started) * 1000, 1)
+        writer.write(b"GET /?format=json HTTP/1.1\r\nHost: api.ipify.org\r\nConnection: close\r\n\r\n")
+        await writer.drain()
+        status = await asyncio.wait_for(reader.readline(), timeout=3.0)
+        match = re.match(rb"HTTP/\d(?:\.\d)?\s+(\d{3})", status)
+        if not match:
+            raise ConnectionError("پاسخ HTTP معتبر از مقصد دریافت نشد")
+        status_code = int(match.group(1))
+        if status_code < 200 or status_code >= 400:
+            raise ConnectionError(f"مقصد پاسخ HTTP {status_code} داد")
+        headers_raw = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), timeout=3.0)
+        body_raw = b""
+        length_match = re.search(rb"(?im)^content-length:\s*(\d+)", headers_raw)
         try:
-            writer.write(b"GET /?format=json HTTP/1.1\r\nHost: api.ipify.org\r\nConnection: close\r\n\r\n")
-            await writer.drain()
-            headers_raw = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), timeout=4)
-            headers_text = headers_raw.decode("iso-8859-1", errors="ignore")
-            length_match = re.search(r"(?im)^content-length:\s*(\d+)", headers_text)
             if length_match:
-                body_raw = await asyncio.wait_for(reader.readexactly(min(int(length_match.group(1)), 512)), timeout=4)
+                body_raw = await asyncio.wait_for(reader.readexactly(min(int(length_match.group(1)), 512)), timeout=2.0)
             else:
-                body_raw = await asyncio.wait_for(reader.read(512), timeout=4)
-            body = body_raw.decode("utf-8", errors="ignore")
-            # Parse the actual IPify response body and support both IPv4 and IPv6.
-            candidates = re.findall(r'"ip"\s*:\s*"([^" ]+)"', body)
-            candidates.extend(re.findall(r"(?<![0-9])(?:\d{1,3}\.){3}\d{1,3}(?![0-9])", body))
-            candidates.extend(re.findall(r"(?<![A-Fa-f0-9:])[A-Fa-f0-9:]{3,}(?![A-Fa-f0-9:])", body))
-            for candidate_ip in candidates:
-                try:
-                    parsed_ip = ipaddress.ip_address(candidate_ip.strip())
-                    if parsed_ip.is_global:
-                        result["egress_ip"] = str(parsed_ip)
-                        break
-                except Exception:
-                    continue
+                body_raw = await asyncio.wait_for(reader.read(512), timeout=2.0)
         except Exception:
             pass
+        body = body_raw.decode("utf-8", errors="ignore")
+        candidates = re.findall(r'"ip"\s*:\s*"([^" ]+)"', body)
+        candidates.extend(re.findall(r"(?<![0-9])(?:\d{1,3}\.){3}\d{1,3}(?![0-9])", body))
+        candidates.extend(re.findall(r"(?<![A-Fa-f0-9:])[A-Fa-f0-9:]{3,}(?![A-Fa-f0-9:])", body))
+        for candidate_ip in candidates:
+            try:
+                parsed_ip = ipaddress.ip_address(candidate_ip.strip())
+                if parsed_ip.is_global:
+                    result["egress_ip"] = str(parsed_ip)
+                    break
+            except Exception:
+                continue
         result["working"] = True
-        writer.close()
-        try:
-            await writer.wait_closed()
-        except Exception:
-            pass
     except Exception as exc:
-        result["error"] = str(exc)[:200]
+        result["error"] = str(exc)[:200] or type(exc).__name__
+    finally:
+        if writer is not None:
+            await _close_writer_safely(writer)
     return result
 
 
 async def _proxy_test_connect(proxy: dict) -> dict:
-    """Retry one transient first-connect failure with a fresh proxy tunnel."""
-    first = await _proxy_test_connect_once(proxy)
-    if first.get("working") or first.get("error") == "host/port نامعتبر":
-        return first
+    """Detect SOCKS4/5 and HTTP/HTTPS, selecting the fastest working tunnel."""
+    protocols = ("socks4", "socks5", "http", "https")
+    host = str(proxy.get("host") or "").strip()
+    try:
+        port = int(proxy.get("port") or 0)
+    except (TypeError, ValueError):
+        port = 0
+    if not host or not (1 <= port <= 65535):
+        return {"protocol": "", "ping_ms": None, "egress_ip": "", "working": False, "error": "host/port نامعتبر"}
 
-    error = str(first.get("error") or "")
-    # Credentials and unsupported protocol methods are definitive; retrying
-    # them cannot make the proxy accept the connection.
-    permanent_markers = ("auth failed", "requires auth", "unsupported auth", "HTTP/1.1 407", "HTTP/1.0 407")
-    if any(marker.lower() in error.lower() for marker in permanent_markers):
-        return first
+    async def probe(protocol: str):
+        candidate = {**proxy, "protocol": protocol}
+        try:
+            return await asyncio.wait_for(_proxy_test_connect_once(candidate), timeout=6.0)
+        except Exception as exc:
+            return {"protocol": protocol, "ping_ms": None, "egress_ip": "", "working": False, "error": str(exc)[:160] or type(exc).__name__}
 
-    await asyncio.sleep(0.35)
-    retry = await _proxy_test_connect_once(proxy)
-    if retry.get("working"):
-        retry["retry_count"] = 1
-        return retry
-    retry_error = str(retry.get("error") or "")
-    if error and retry_error and retry_error != error:
-        retry["error"] = f"{error}; retry: {retry_error}"[:200]
-    return retry
+    results = await asyncio.gather(*(probe(proto) for proto in protocols))
+    successful = [r for r in results if r.get("working")]
+    retry_count = 0
+    if not successful:
+        # Some proxy daemons reject the first connection while starting their
+        # listener; repeat the protocol sweep once so the first UI test behaves
+        # like subsequent tests without pinning a guessed protocol.
+        await asyncio.sleep(0.25)
+        results = await asyncio.gather(*(probe(proto) for proto in protocols))
+        successful = [r for r in results if r.get("working")]
+        retry_count = 1
+    if successful:
+        best = min(successful, key=lambda item: float(item.get("ping_ms") or float("inf")))
+        best["tested_protocols"] = protocols
+        if retry_count:
+            best["retry_count"] = retry_count
+        return best
+    errors = []
+    for result in results:
+        detail = str(result.get("error") or "failed")
+        if detail not in errors:
+            errors.append(detail)
+    return {"protocol": "", "ping_ms": None, "egress_ip": "", "working": False,
+            "tested_protocols": protocols, "error": "؛ ".join(errors)[:200]}
+
+async def _migrate_proxy_protocols() -> None:
+    """Auto-detect protocol for proxy records saved before protocol probing."""
+    pending = [(pid, dict(proxy)) for pid, proxy in PROXIES.items()
+               if not proxy.get("protocol_detected")]
+    if not pending:
+        return
+    semaphore = asyncio.Semaphore(4)
+
+    async def detect(pid: str, proxy: dict):
+        async with semaphore:
+            try:
+                result = await _proxy_test_connect(proxy)
+            except Exception as exc:
+                logger.info("proxy protocol migration failed for %s: %s", pid, exc)
+                return pid, None
+        return pid, result
+
+    results = await asyncio.gather(*(detect(pid, proxy) for pid, proxy in pending))
+    changed = False
+    async with PROXIES_LOCK:
+        for pid, result in results:
+            if not result or not result.get("working") or pid not in PROXIES:
+                continue
+            PROXIES[pid].update({
+                "protocol": result.get("protocol") or PROXIES[pid].get("protocol", "http"),
+                "protocol_detected": True,
+                "ping_ms": result.get("ping_ms"),
+                "egress_ip": result.get("egress_ip") or "",
+                "working": True,
+                "last_test_at": now_ir().isoformat(timespec="seconds"),
+                "error": "",
+            })
+            changed = True
+    if changed:
+        await save_state()
+        log_activity("proxy", "پروتکل پروکسی‌های ذخیره‌شده خودکار شناسایی شد", "ok")
+
 
 def _proxy_public(p: dict) -> dict:
     return _mask_proxy_password(p)
@@ -13272,7 +13347,7 @@ async def test_proxy(request: Request, _=Depends(require_auth)):
         candidate = {
             "protocol": str(body.get("protocol") or "http").lower(),
             "host": str(body.get("host") or "").strip(),
-            "port": int(body.get("port") or 0),
+            "port": body.get("port"),
             "username": str(body.get("username") or "").strip(),
             "password": str(body.get("password") or "").strip(),
         }
@@ -13285,6 +13360,8 @@ async def test_proxy(request: Request, _=Depends(require_auth)):
         async with PROXIES_LOCK:
             if proxy_id in PROXIES:
                 PROXIES[proxy_id].update({
+                    "protocol": result.get("protocol") or PROXIES[proxy_id].get("protocol", "http"),
+                    "protocol_detected": bool(result.get("working")),
                     "ping_ms": result["ping_ms"],
                     "egress_ip": result["egress_ip"],
                     "working": result["working"],
@@ -13304,11 +13381,22 @@ async def test_proxy(request: Request, _=Depends(require_auth)):
 async def create_proxy(request: Request, _=Depends(require_auth)):
     """Create a new external proxy after a successful connection test."""
     body = await request.json()
-    protocol = str(body.get("protocol") or "http").lower()
-    if protocol not in ("socks5", "http"):
-        raise HTTPException(status_code=400, detail="protocol must be socks5 or http")
+    protocol = str(body.get("protocol") or "").lower()
+    if protocol not in ("socks4", "socks5", "http", "https"):
+        detection = await _proxy_test_connect({
+            "host": str(body.get("host") or "").strip(),
+            "port": body.get("port"),
+            "username": str(body.get("username") or "").strip(),
+            "password": str(body.get("password") or "").strip(),
+        })
+        if not detection.get("working"):
+            raise HTTPException(status_code=400, detail=detection.get("error") or "proxy connection failed")
+        protocol = str(detection.get("protocol") or "")
     host = str(body.get("host") or "").strip()[:255]
-    port = int(body.get("port") or 0)
+    try:
+        port = int(body.get("port") or 0)
+    except (TypeError, ValueError):
+        port = 0
     if not host or not (1 <= port <= 65535):
         raise HTTPException(status_code=400, detail="host and valid port required")
     username = str(body.get("username") or "").strip()[:128]
@@ -13369,6 +13457,7 @@ async def create_proxy(request: Request, _=Depends(require_auth)):
         PROXIES[proxy_id] = {
             "id": proxy_id,
             "protocol": protocol,
+            "protocol_detected": True,
             "host": host,
             "port": port,
             "username": username,
@@ -13614,6 +13703,8 @@ async def ping_proxy(proxy_id: str, _=Depends(require_auth)):
     async with PROXIES_LOCK:
         if proxy_id in PROXIES:
             PROXIES[proxy_id].update({
+                "protocol": result.get("protocol") or PROXIES[proxy_id].get("protocol", "http"),
+                "protocol_detected": bool(result.get("working")),
                 "ping_ms": result["ping_ms"],
                 "egress_ip": result["egress_ip"],
                 "working": result["working"],

@@ -663,8 +663,21 @@ tr{animation:fadeIn .3s ease}
 .ds-ip-row{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:36px;border-bottom:1px solid var(--border);font-size:11px;color:var(--txt2)}
 .ds-ip-row:last-child{border:0}
 .ds-ip-value{max-width:75%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:700;color:var(--txt)}
+.dash-bandwidth-card{width:100%;max-width:none;padding:0;overflow:hidden}
+.dash-bw-grid{display:grid;grid-template-columns:1fr 1fr;direction:ltr}
+.dash-bw-col{min-width:0;padding:18px 24px}
+.dash-bw-col+ .dash-bw-col{border-inline-start:1px solid var(--border)}
+.dash-bw-heading{display:flex;align-items:baseline;gap:8px;min-width:0;white-space:nowrap}
+.dash-bw-heading strong{font-size:32px;line-height:1.1;font-weight:800;color:var(--txt);letter-spacing:-.7px}
+.dash-bw-unit{font-size:15px;color:var(--txt2)}
+.dash-bw-label{font-size:14px;font-weight:600;color:var(--txt2);overflow:hidden;text-overflow:ellipsis}
+.dash-bw-marker{margin-inline-start:auto;width:28px;height:8px;border-radius:8px;background:rgba(128,128,128,.16);flex:none}
+.dash-bw-bars{height:62px;display:flex;align-items:flex-end;gap:5px;margin:16px 0 12px;direction:ltr}
+.dash-bw-bars span{flex:1;min-width:3px;height:5%;border-radius:4px;background:rgba(155,157,163,.58);transition:height .35s ease,background-color .2s}
+.dash-bw-bars span.current{background:#e1e2e5}
+.dash-bw-peak{font-size:12px;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .speed-limit-field .px-hint{margin-top:0}
-@media(max-width:640px){.dash-system-card{max-width:none;padding:15px}.ds-row{gap:10px}.ds-spark{height:20px}}
+@media(max-width:640px){.dash-system-card{max-width:none;padding:15px}.ds-row{gap:10px}.ds-spark{height:20px}.dash-bw-col{padding:14px 11px}.dash-bw-heading{gap:5px}.dash-bw-heading strong{font-size:23px;letter-spacing:-.4px}.dash-bw-unit{font-size:11px}.dash-bw-label{font-size:11px}.dash-bw-marker{width:16px;height:6px}.dash-bw-bars{height:48px;gap:3px;margin:12px 0 9px}.dash-bw-bars span{min-width:2px}.dash-bw-peak{font-size:9px}}
 
 /* Modal - Glass */
 .modal{
@@ -681,9 +694,9 @@ tr{animation:fadeIn .3s ease}
 .modal-c::before{content:none}
 .modal-t{font-size:19px;font-weight:700;margin-bottom:18px;position:relative}
 .modal-t .glow{background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.cfg-copy-btn{position:absolute;left:0;top:50%;transform:translateY(-50%);width:34px;height:34px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:10px;cursor:pointer}
-.cfg-copy-btn svg{width:17px;height:17px}
-.cfg-copy-btn:active{transform:translateY(-50%) scale(.94)}
+.cfg-copy-btn{flex:0 0 46px!important;width:46px;height:42px;min-height:42px;padding:0!important;display:flex;align-items:center;justify-content:center;border-radius:10px;cursor:pointer}
+.cfg-copy-btn svg{width:18px;height:18px}
+.cfg-copy-btn:active{transform:scale(.94)}
 .modal-btns{display:flex;gap:8px;margin-top:18px;position:relative}
 .modal-btns .btn{flex:1;justify-content:center;padding:11px}
 /* Modal X close button (top-right corner of every modal) */
@@ -1072,8 +1085,7 @@ tr{animation:fadeIn .3s ease}
 
 /* Shared content accordion (users, inbounds, scanner, worker, settings) */
 .spd-acc-list{display:flex;flex-direction:column;gap:8px}
-#users-list .spd-acc-list,#inbounds-list .spd-acc-list{width:100%;max-width:900px;margin-left:auto;margin-right:0;align-self:flex-end}
-@media(max-width:640px){#users-list .spd-acc-list,#inbounds-list .spd-acc-list{width:calc(100% - 14px);margin-left:auto;margin-right:0}}
+#users-list .spd-acc-list,#inbounds-list .spd-acc-list{width:100%;max-width:none;margin:0;align-self:stretch}
 .spd-acc{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--bg2,transparent)}
 .spd-acc-head{width:100%;display:flex;align-items:center;gap:10px;padding:12px 14px;background:transparent;color:var(--txt);border:0;cursor:pointer;font:600 13px inherit;text-align:right}
 .spd-acc-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1220,72 +1232,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   outline-offset: 2px;
 }
 
-/* Compact layout controls and typography across desktop and mobile. */
-.sidebar{width:224px}
-.main-area{margin-right:224px}
-.sb-brand{padding:15px 14px;gap:9px}
-.sb-brand img{width:44px;height:44px;border-radius:11px}
-.sb-brand-t{font-size:14px;letter-spacing:2px}
-.sb-brand-s{font-size:9px;letter-spacing:3px}
-.sb-nav{padding:8px;gap:1px}
-.nav-item{padding:8px 10px;gap:8px;font-size:11.5px;border-radius:9px}
-.nav-item .nav-ic{width:17px;height:17px}
-.nav-item .nav-ic svg,.nav-item .nav-ic .material-symbols-outlined{width:17px;height:17px;font-size:16px!important}
-.nav-accordion{border-radius:10px}
-.nav-accordion-head{padding:8px 10px;font-size:11.5px}
-.nav-accordion-ic,.nav-accordion-arrow{font-size:16px}
-.sb-foot{padding:11px 14px;font-size:10px}
-.topbar{padding:9px 16px}
-.topbar-greet{font-size:12px}
-.topbar-r{gap:6px}
-.lang-btn{min-height:30px;padding:4px 8px;gap:4px;font-size:10.5px}
-#theme-ic{font-size:15px!important}
-#lang-flag svg{width:14px;height:14px}
-.sidebar-tog{min-width:30px;min-height:30px;padding:4px!important}
-.sidebar-tog svg{width:16px;height:16px}
-.content{padding:16px 18px}
-.panel-h{font-size:13px}
-.stat{padding:13px 12px}
-.stat-v{font-size:22px}
-.stat-l{font-size:10px}
-.btn,.login-btn{min-height:32px;padding:7px 11px;font-size:11px}
-.btn-sm{min-height:28px;padding:5px 8px;font-size:10px}
-.btn-icon{width:32px;height:32px;min-height:32px;padding:0}
-.theme-dot{width:27px;height:27px}
-.spd-acc-head{padding:10px 12px;font-size:11.5px}
-.px-head{padding:9px 10px}
-.px-flag{font-size:17px}
-.px-meta b{font-size:12px}
-.px-meta span{font-size:10px}
-.dash-system-card{padding:15px}
-
-@media(max-width:900px){
-  .sidebar{width:224px}
-  .main-area{margin-right:0}
-  .topbar{padding:8px 11px}
-  .topbar-greet{font-size:11px}
-  .topbar-r{gap:5px}
-  .lang-btn{min-height:29px;padding:4px 7px;font-size:10px!important}
-  .sidebar-tog{min-height:29px;padding:4px!important}
-  .content{padding:11px}
-  .stat{padding:11px 9px}
-  .stat-v{font-size:19px}
-  .btn,.login-btn{min-height:31px;padding:6px 9px;font-size:10.5px!important}
-  .btn-sm{min-height:28px;padding:5px 7px;font-size:10px!important}
-  .sb-brand{padding:13px 12px}
-  .nav-item{padding:8px 9px;font-size:11px}
-  .nav-accordion-head{padding:8px 9px;font-size:11px}
-}
-@media(max-width:640px){
-  .content{padding:9px}
-  .panel-h{font-size:12px}
-  .stat-v{font-size:18px}
-  .stat-l{font-size:9px}
-  .spd-acc-head{padding:9px 10px;font-size:11px}
-  .dash-system-card{padding:12px}
-  .px-actions{gap:6px}
-  .px-actions .btn{min-height:29px;padding:5px 7px;font-size:9.5px!important}
-}
 .adv-inbound-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;align-items:start}
 .adv-inbound-card{min-width:0}
 .adv-inbound-card.open{grid-column:1/-1;border-color:var(--border-glow)}
@@ -1297,7 +1243,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .adv-inbound-json{display:block;width:100%;min-height:320px;resize:vertical;padding:10px;background:var(--input-bg);border:1px solid var(--border);border-radius:9px;color:var(--txt);font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;white-space:pre;user-select:text;-webkit-user-select:text}
 .adv-inbound-save{margin-top:8px}
 @media(max-width:640px){.adv-inbound-grid{grid-template-columns:repeat(auto-fit,minmax(155px,1fr))}.adv-inbound-head{min-height:54px}.adv-inbound-json{min-height:260px;font-size:13px}}
-.suggest-acc-list{width:100%;max-width:900px;margin-left:auto;margin-right:0}
+.suggest-acc-list{width:100%;max-width:none;margin-left:0;margin-right:0}
 .suggest-link-list{display:flex;flex-direction:column;gap:6px}
 #tab-suggest .suggest-link-list a{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:36px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--txt);direction:ltr;text-align:left;text-decoration:none;font-size:11px}
 #tab-suggest .suggest-link-list a:hover{border-color:var(--border-glow);background:var(--nav-bg)}
@@ -1410,11 +1356,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
         <span class="nav-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10a8 8 0 0116 0v10"/><line x1="2" y1="20" x2="22" y2="20"/><line x1="9" y1="20" x2="9" y2="13"/><line x1="15" y1="20" x2="15" y2="13"/></svg></span>
         <span data-i18n="tunnel">Tunnel</span>
       </div>
-      <div class="nav-item" onclick="switchTab('suggest',this)">
-        <span class="nav-ic"><span class="material-symbols-outlined" style="font-size:18px">lightbulb</span></span>
-        <span>Suggest</span>
-      </div>
-
       <div class="nav-accordion" id="system-nav-accordion">
         <button class="nav-accordion-head" type="button" onclick="toggleSystemNavAccordion()" aria-expanded="false">
           <span class="nav-accordion-title"><span class="material-symbols-outlined nav-accordion-ic">settings</span><span data-i18n="systemGroup">سیستم</span></span>
@@ -1435,6 +1376,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
           </div>
         </div>
       </div>
+      <div class="nav-item" onclick="switchTab('suggest',this)">
+        <span class="nav-ic"><span class="material-symbols-outlined" style="font-size:18px">lightbulb</span></span>
+        <span>Suggest</span>
+      </div>
+
       <div class="nav-item" onclick="switchTab('contact',this)">
         <span class="nav-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg></span>
         <span data-i18n="contact">Contact Me</span>
@@ -2037,9 +1983,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
             <!-- PROXY TAB -->
       <style>
-        .px-proto{display:flex;gap:6px;margin:8px 0 0}
-        .px-proto button{flex:1;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:var(--bg2);color:var(--txt2);font-weight:700;font-size:12px;cursor:pointer;transition:.15s;font-family:inherit}
-        .px-proto button.on{background:var(--nav-bg);color:var(--nav-color);border-color:var(--border-glow);box-shadow:var(--glow-sm,0 0 10px rgba(43,127,255,.25))}
         .px-add{border:1px dashed var(--border);border-radius:12px;padding:14px;margin-top:12px;background:var(--bg2)}
         .px-test{margin-top:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);font-size:12px;display:none;line-height:1.9}
         .px-test.show{display:block}
@@ -2062,7 +2005,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
             <span class="glow">🌐 <span data-i18n="proxy.nav">پروکسی خارجی</span></span>
             <span id="px-count" class="badge" style="margin-right:auto"></span>
           </div>
-          <div class="px-hint" data-i18n="proxy.intro">پروکسی SOCKS5 یا HTTP اضافه کنید. برای هر پروکسی یک اینباند TLS+WS روی دامنه جاری پنل ساخته می‌شود؛ کاربران را با انتخاب همان اینباند در فرم ساخت یا ویرایش کاربر وصل کنید.</div>
+          <div class="px-hint" data-i18n="proxy.intro">آدرس و پورت پروکسی را وارد کنید؛ پنل SOCKS4، SOCKS5، HTTP و HTTPS را آزمایش می‌کند و سریع‌ترین اتصال موفق را انتخاب می‌کند. برای هر پروکسی یک اینباند TLS+WS روی دامنه پنل ساخته می‌شود.</div>
 
           <button class="btn btn-p" style="width:100%;margin-top:12px" type="button" onclick="pxToggleAdd(this)" aria-expanded="false">
             <span class="material-symbols-outlined" style="font-size:16px">add_circle</span>
@@ -2071,16 +2014,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
           <!-- ADD FORM -->
           <div class="px-add hidden" id="px-add">
-            <div class="px-proto" role="tablist">
-              <button type="button" id="px-proto-socks5" class="on" onclick="pxSetProto('socks5')">SOCKS5</button>
-              <button type="button" id="px-proto-http" onclick="pxSetProto('http')">HTTP</button>
-            </div>
-            <input type="hidden" id="px-protocol" value="socks5">
             <div class="f-r" style="margin-top:12px">
-              <div class="f-g"><label data-i18n="proxy.host">آدرس (IP یا دامنه)</label><input id="px-host" type="text" dir="ltr" placeholder="1.2.3.4" autocomplete="off"></div>
-              <div class="f-g"><label data-i18n="proxy.port">پورت</label><input id="px-port" type="number" min="1" max="65535" dir="ltr" placeholder="1080"></div>
+              <div class="f-g"><label data-i18n="proxy.host">آدرس (IP یا دامنه)</label><input id="px-host" type="text" dir="ltr" placeholder="1.2.3.4" autocomplete="off" oninput="pxInvalidateTest()"></div>
+              <div class="f-g"><label data-i18n="proxy.port">پورت</label><input id="px-port" type="number" min="1" max="65535" dir="ltr" placeholder="1080" oninput="pxInvalidateTest()"></div>
             </div>
-            <div class="f-g"><label data-i18n="proxy.country">کشور (اختیاری)</label><input id="px-country" type="text" dir="ltr" placeholder="Germany یا DE یا 🇩🇪"></div>
+            <div class="f-g"><label data-i18n="proxy.country">کشور (اختیاری)</label><input id="px-country" type="text" dir="ltr" placeholder="Germany یا DE یا 🇩🇪" oninput="pxInvalidateTest()"></div>
 
             <!-- optional credentials, collapsed -->
             <div class="spd-acc" style="margin-top:10px">
@@ -2091,8 +2029,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
               <div class="spd-acc-body" id="acc-px-auth">
                 <div class="px-hint" data-i18n="proxy.authHint">اگر پروکسی شناسه نمی‌خواهد این بخش را باز نکنید.</div>
                 <div class="f-r" style="margin-top:8px">
-                  <div class="f-g"><label data-i18n="proxy.username">Username</label><input id="px-username" type="text" dir="ltr" autocomplete="off"></div>
-                  <div class="f-g"><label data-i18n="proxy.password">Password</label><input id="px-password" type="password" dir="ltr" autocomplete="new-password"></div>
+                  <div class="f-g"><label data-i18n="proxy.username">Username</label><input id="px-username" type="text" dir="ltr" autocomplete="off" oninput="pxInvalidateTest()"></div>
+                  <div class="f-g"><label data-i18n="proxy.password">Password</label><input id="px-password" type="password" dir="ltr" autocomplete="new-password" oninput="pxInvalidateTest()"></div>
                 </div>
               </div>
             </div>
@@ -2535,15 +2473,15 @@ IMPLEMENTATION RULES
 <div class="modal" id="mod-cfg"><div class="modal-c">
   <div class="modal-t">
     <span class="glow" data-i18n="config">کانفیگ</span>
+  </div>
+  <pre class="cfg-code" id="cfg-code"></pre>
+  <div class="modal-btns">
     <button type="button" class="btn btn-g cfg-copy-btn" onclick="copyCfg()" title="کپی همه کانفیگ‌ها" aria-label="کپی همه کانفیگ‌ها">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <rect x="9" y="9" width="11" height="11" rx="2"></rect>
         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
       </svg>
     </button>
-  </div>
-  <pre class="cfg-code" id="cfg-code"></pre>
-  <div class="modal-btns">
     <button class="btn btn-g" onclick="closeModal('mod-cfg')"><span data-i18n="close">بستن</span></button>
   </div>
 </div></div>
@@ -2552,7 +2490,10 @@ IMPLEMENTATION RULES
 <div class="modal" id="mod-qr"><div class="modal-c" style="max-width:340px;text-align:center">
   <div class="modal-t"><span class="glow" data-i18n="qrCode">QR Code</span></div>
   <img id="qr-img" src="" style="width:260px;height:260px;background:#fff;border-radius:12px;margin:12px auto;display:block" alt="QR">
-  <button class="btn btn-g" onclick="closeModal('mod-qr')" style="width:100%"><span data-i18n="close">بستن</span></button>
+  <div class="modal-btns">
+    <button type="button" class="btn btn-g" onclick="openQrSubscription()">Go Sub</button>
+    <button type="button" class="btn btn-g" onclick="closeModal('mod-qr')"><span data-i18n="close">بستن</span></button>
+  </div>
 </div></div>
 
 <!-- TOAST -->
@@ -2583,7 +2524,7 @@ var I18N = {
     'helpAddressSaved': 'آدرس کانفیگ ذخیره شد', 'helpAddressInvalid': 'دامنه یا IP معتبر وارد کنید', 'helpIpv6NotFound': 'برای دامنه پنل IPv6 پیدا نشد', 'helpSettingsSaved': 'تنظیمات ذخیره شد',
     'helpFeatureHint': 'این گزینه‌ها فقط به کانفیگ‌های اینباند پیش‌فرض TLS + WS افزوده می‌شوند.', 'helpEch': 'افزودن ECH', 'helpEchHint': 'پارامتر ECH را به کانفیگ‌های TLS + WS پیش‌فرض اضافه می‌کند.', 'helpFf': 'افزودن F+F', 'helpFfHint': 'مجموعه cipher و تنظیمات fragment نمونه را به کانفیگ‌های TLS + WS پیش‌فرض اضافه می‌کند و هنگام فعال بودن، fingerprint را روی unsafe می‌گذارد.',
     'helpSpoof': 'Spoof', 'helpSpoofHint': 'پارامتر snispoofing را به کانفیگ‌های TLS + WS پیش‌فرض اضافه می‌کند.', 'helpSpoofSni': 'SNI جعلی', 'helpSpoofIp': 'IP مقصد', 'helpSpoofMissing': 'برای فعال کردن Spoof، SNI و IP را وارد کنید', 'helpSpoofSaved': 'تنظیمات Spoof ذخیره شد',
-    'advancedInboundHint': 'یک اینباند را انتخاب کنید و JSON کامل آن را ویرایش کنید. تغییرات ذخیره و برای سرویس اعمال می‌شوند.', 'advancedSelectInbound': 'انتخاب اینباند', 'advancedChooseInbound': 'انتخاب کنید', 'advancedJson': 'JSON اینباند', 'advancedSave': 'ذخیره JSON', 'advancedSaved': 'JSON اینباند ذخیره شد', 'advancedInvalidJson': 'JSON معتبر نیست', 'advancedNoInbounds': 'اینباند قابل ویرایشی وجود ندارد', 'defaultTlsWsInbound': 'پیش‌فرض TLS + WS', 'defaultHttpWsInbound': 'پیش‌فرض HTTP + WS',
+    'advancedInboundHint': 'یک اینباند را انتخاب کنید و JSON کامل آن را ویرایش کنید. تغییرات ذخیره و برای سرویس اعمال می‌شوند.', 'advancedSelectInbound': 'انتخاب اینباند', 'advancedChooseInbound': 'انتخاب کنید', 'advancedJson': 'JSON اینباند', 'advancedSave': 'ذخیره JSON', 'advancedSaved': 'JSON اینباند ذخیره شد', 'advancedInvalidJson': 'JSON معتبر نیست', 'advancedNoInbounds': 'اینباند قابل ویرایشی وجود ندارد', 'defaultTlsWsInbound': 'پیش‌فرض TLS + WS',
     'inboundFixedHint': 'فقط اینباندهای پیش‌فرض پنل استفاده می‌شوند. WS/TLS به‌صورت خودکار با دامنه اصلی پنل آماده است؛ Reality را با دامنه و پورت خودتان تکمیل کنید (کلید pbk به‌صورت خودکار ساخته می‌شود).', 'inboundFixed': 'افزودن اینباند غیرفعال است — فقط اینباندهای پیش‌فرض.', 'inboundAuto': 'این اینباند خودکار است و نیازی به تنظیم ندارد.',
     'newUser': 'کاربر جدید', 'newInbound': 'اینباند جدید', 'domain': 'دامنه',
     'loading': 'در حال بارگذاری...', 'noUsers': 'هیچ کاربری وجود ندارد', 'noInbounds': 'هیچ اینباندی وجود ندارد', 'errLoadUsers': 'خطا در بارگذاری کاربران', 'errLoadInbounds': 'خطا در بارگذاری اینباندها', 'errLoadStats': 'خطا در بارگذاری آمار',
@@ -2623,7 +2564,7 @@ var I18N = {
     'config': 'کانفیگ', 'copy': 'کپی', 'close': 'بستن', 'copied': 'کانفیگ کپی شد', 'noCfg': 'کانفیگی موجود نیست', 'errCopy': 'خطا در کپی', 'notFound': 'یافت نشد', 'delete': 'حذف', 'edit': 'ویرایش', 'unlimited': 'نامحدود', 'expired': 'منقضی', 'daysUnit': ' روز', 'default': 'پیش‌فرض', 'usersCount': 'کاربران', 'secNetwork': 'شبکه', 'security': 'امنیت', 'action': 'عملیات', 'expiry': 'انقضا', 'connTh': 'اتصال',
     'confirmDeleteUser': 'آیا از حذف این کاربر اطمینان دارید؟', 'confirmDeleteInbound': 'آیا از حذف این اینباند اطمینان دارید؟', 'keysGenerated': 'کلیدهای Reality تولید شد', 'errKeyGen': 'خطا در تولید کلید', 'shortIdGen': 'Short ID تولید شد', 'shortIdNew': 'Short ID جدید تولید شد',
     'inboundUpdated': 'اینباند بروزرسانی شد', 'inboundCreated': 'اینباند ایجاد شد', 'updateInbound': 'بروزرسانی اینباند', 'inboundDeleted': 'اینباند حذف شد',
-    'srv': 'وضعیت زنده سرور', 'cpu': 'پردازنده', 'ram': 'حافظه رم', 'disk': 'دیسک', 'sent': 'ارسال', 'recv': 'دریافت', 'activeUsers': 'کاربران فعال/کل', 'trafficUsed': 'ترافیک مصرفی', 'activeConns': 'اتصالات فعال', 'uptime': 'زمان فعالیت',
+    'srv': 'وضعیت زنده سرور', 'cpu': 'پردازنده', 'ram': 'حافظه رم', 'disk': 'دیسک', 'sent': 'ارسال', 'recv': 'دریافت', 'download': 'دانلود', 'upload': 'آپلود', 'activeUsers': 'کاربران فعال/کل', 'trafficUsed': 'ترافیک مصرفی', 'activeConns': 'اتصالات فعال', 'uptime': 'زمان فعالیت',
     'goodMorning': 'صبح بخیر', 'goodNoon': 'ظهر بخیر', 'goodEvening': 'عصر بخیر', 'admin': 'ادمین',
     'toast.userCreated': 'کاربر ایجاد شد', 'toast.userUpdated': 'کاربر بروزرسانی شد', 'toast.userDeleted': 'کاربر حذف شد', 'toast.userToggled': 'وضعیت کاربر تغییر کرد', 'toast.inboundSaved': 'اینباند ذخیره شد', 'toast.domainSaved': 'دامنه ذخیره شد', 'toast.passChanged': 'رمز تغییر کرد', 'toast.err': 'خطا',
     'backupDownloaded': 'بکاپ دانلود شد', 'restoreDone': 'بازیابی انجام شد', 'restoreFailed': 'بازیابی ناموفق', 'restoreUploading': 'در حال آپلود و بازیابی...', 'restoreUploadFailed': 'آپلود ناموفق',
@@ -2651,7 +2592,7 @@ var I18N = {
     'helpAddressSaved': 'Config address saved', 'helpAddressInvalid': 'Enter a valid domain or IP address', 'helpIpv6NotFound': 'No IPv6 address was found for the panel domain', 'helpSettingsSaved': 'Settings saved',
     'helpFeatureHint': 'These options are added only to configs from the default TLS + WS inbound.', 'helpEch': 'Add ECH', 'helpEchHint': 'Adds the ECH parameter to default TLS + WS configs.', 'helpFf': 'Add F+F', 'helpFfHint': 'Adds the sample cipher suite and fragmentation parameters to default TLS + WS configs, and sets the fingerprint to unsafe while it is on.',
     'helpSpoof': 'Spoof', 'helpSpoofHint': 'Adds the snispoofing parameter to default TLS + WS configs.', 'helpSpoofSni': 'Fake SNI', 'helpSpoofIp': 'Target IP', 'helpSpoofMissing': 'Enter the SNI and IP to enable Spoof', 'helpSpoofSaved': 'Spoof settings saved',
-    'advancedInboundHint': 'Select an inbound and edit its full JSON. Changes are saved and applied to the service.', 'advancedSelectInbound': 'Select inbound', 'advancedChooseInbound': 'Choose an inbound', 'advancedJson': 'Inbound JSON', 'advancedSave': 'Save JSON', 'advancedSaved': 'Inbound JSON saved', 'advancedInvalidJson': 'Invalid JSON', 'advancedNoInbounds': 'No editable inbounds', 'defaultTlsWsInbound': 'Default TLS + WS', 'defaultHttpWsInbound': 'Default HTTP + WS',
+    'advancedInboundHint': 'Select an inbound and edit its full JSON. Changes are saved and applied to the service.', 'advancedSelectInbound': 'Select inbound', 'advancedChooseInbound': 'Choose an inbound', 'advancedJson': 'Inbound JSON', 'advancedSave': 'Save JSON', 'advancedSaved': 'Inbound JSON saved', 'advancedInvalidJson': 'Invalid JSON', 'advancedNoInbounds': 'No editable inbounds', 'defaultTlsWsInbound': 'Default TLS + WS',
     'inboundFixedHint': 'Only the panel’s default inbounds are used. WS/TLS is ready automatically with the panel’s main domain; fill Reality’s domain & ports yourself (pbk is auto-generated).', 'inboundFixed': 'Adding inbounds is disabled — only the default inbounds.', 'inboundAuto': 'This inbound is automatic — nothing to configure.',
     'newUser': 'New User', 'newInbound': 'New Inbound', 'domain': 'Domain',
     'loading': 'Loading...', 'noUsers': 'No users found', 'noInbounds': 'No inbounds found', 'errLoadUsers': 'Error loading users', 'errLoadInbounds': 'Error loading inbounds', 'errLoadStats': 'Error loading stats',
@@ -2691,7 +2632,7 @@ var I18N = {
     'config': 'Config', 'copy': 'Copy', 'close': 'Close', 'copied': 'Config copied', 'noCfg': 'No config available', 'errCopy': 'Copy failed', 'notFound': 'Not found', 'delete': 'Delete', 'edit': 'Edit', 'unlimited': 'Unlimited', 'expired': 'Expired', 'daysUnit': ' days', 'default': 'Default', 'usersCount': 'Users', 'secNetwork': 'Network', 'security': 'Security', 'action': 'Actions', 'expiry': 'Expiry', 'connTh': 'Conn',
     'confirmDeleteUser': 'Are you sure you want to delete this user?', 'confirmDeleteInbound': 'Are you sure you want to delete this inbound?', 'keysGenerated': 'Reality keys generated', 'errKeyGen': 'Key generation failed', 'shortIdGen': 'Short ID generated', 'shortIdNew': 'New Short ID generated',
     'inboundUpdated': 'Inbound updated', 'inboundCreated': 'Inbound created', 'updateInbound': 'Update Inbound', 'inboundDeleted': 'Inbound deleted',
-    'srv': 'Live Server Status', 'cpu': 'CPU', 'ram': 'RAM', 'disk': 'Disk', 'sent': 'Sent', 'recv': 'Received', 'activeUsers': 'Active / Total Users', 'trafficUsed': 'Traffic Used', 'activeConns': 'Active Connections', 'uptime': 'Uptime',
+    'srv': 'Live Server Status', 'cpu': 'CPU', 'ram': 'RAM', 'disk': 'Disk', 'sent': 'Sent', 'recv': 'Received', 'download': 'Download', 'upload': 'Upload', 'activeUsers': 'Active / Total Users', 'trafficUsed': 'Traffic Used', 'activeConns': 'Active Connections', 'uptime': 'Uptime',
     'goodMorning': 'Good morning', 'goodNoon': 'Good afternoon', 'goodEvening': 'Good evening', 'admin': 'Admin',
     'toast.userCreated': 'User created', 'toast.userUpdated': 'User updated', 'toast.userDeleted': 'User deleted', 'toast.userToggled': 'User status changed', 'toast.inboundSaved': 'Inbound saved', 'toast.domainSaved': 'Domain saved', 'toast.passChanged': 'Password changed', 'toast.err': 'Error',
     'backupDownloaded': 'Backup downloaded', 'restoreDone': 'Restore completed', 'restoreFailed': 'Restore failed', 'restoreUploading': 'Uploading and restoring...', 'restoreUploadFailed': 'Upload failed',
@@ -2722,7 +2663,7 @@ Object.assign(I18N.fa, {
   'notif.nav': 'اعلان‌ها', 'notif.title': 'اعلان‌ها', 'notif.refresh': 'بروزرسانی', 'notif.date': 'تاریخ و ساعت',
   'notif.hint': 'اعلان‌ها از مخزن گیت‌هاب دریافت می‌شوند. هر اعلان یک آکاردیون است؛ با زدن روی موضوع، متن کامل به همراه تاریخ و ساعت نمایش داده می‌شود.',
   'notif.loading': 'در حال دریافت اعلان‌ها...', 'notif.empty': 'فعلاً اعلانی ثبت نشده است.', 'notif.error': 'دریافت اعلان‌ها از گیت‌هاب ممکن نشد.',
-  'proxy.nav': 'پروکسی', 'proxy.detectedCountry': 'کشور شناسایی‌شده', 'proxy.intro': 'پروکسی SOCKS5 یا HTTP اضافه کنید. برای هر پروکسی یک اینباند TLS+WS روی دامنه جاری پنل ساخته می‌شود؛ کاربرها را با انتخاب همان اینباند در فرم ساخت یا ویرایش کاربر وصل کنید.', 'proxy.inboundHint': 'ترافیک این اینباند از پروکسی انتخاب‌شده عبور می‌کند.',
+  'proxy.nav': 'پروکسی', 'proxy.protocol': 'پروتکل انتخاب‌شده', 'proxy.detectedCountry': 'کشور شناسایی‌شده', 'proxy.intro': 'آدرس و پورت پروکسی را وارد کنید؛ پنل SOCKS4، SOCKS5، HTTP و HTTPS را آزمایش می‌کند و سریع‌ترین اتصال موفق را انتخاب می‌کند. برای هر پروکسی یک اینباند TLS+WS روی دامنه پنل ساخته می‌شود.', 'proxy.inboundHint': 'ترافیک این اینباند از پروکسی انتخاب‌شده عبور می‌کند.',
   'proxy.add': 'افزودن پروکسی', 'proxy.host': 'آدرس (IP یا دامنه)', 'proxy.port': 'پورت', 'proxy.country': 'کشور (اختیاری)',
   'proxy.auth': 'نام کاربری و رمز (اختیاری)', 'proxy.authHint': 'اگر پروکسی شناسه نمی‌خواهد این بخش را باز نکنید.', 'proxy.username': 'Username', 'proxy.password': 'Password',
   'proxy.test': 'تست اتصال', 'proxy.testing': 'در حال تست', 'proxy.save': 'ذخیره پروکسی', 'proxy.working': 'سالم ✓', 'proxy.notWorking': 'کار نمی‌کند',
@@ -2759,7 +2700,7 @@ Object.assign(I18N.en, {
   'notif.nav': 'Notifications', 'notif.title': 'Notifications', 'notif.refresh': 'Refresh', 'notif.date': 'Date & time',
   'notif.hint': 'Announcements are pulled from the GitHub repository. Each one is an accordion: click the subject to reveal the full text together with its date and time.',
   'notif.loading': 'Loading announcements...', 'notif.empty': 'No announcements published yet.', 'notif.error': 'Could not fetch announcements from GitHub.',
-  'proxy.nav': 'Proxies', 'proxy.detectedCountry': 'Detected country', 'proxy.intro': 'Add a SOCKS5 or HTTP proxy. Each proxy creates a TLS+WS inbound on the panel’s current domain; assign it by selecting that inbound when creating or editing a user.', 'proxy.inboundHint': 'Traffic on this inbound exits through the selected proxy.',
+  'proxy.nav': 'Proxies', 'proxy.protocol': 'Selected protocol', 'proxy.detectedCountry': 'Detected country', 'proxy.intro': 'Enter a proxy address and port. The panel tests SOCKS4, SOCKS5, HTTP, and HTTPS, then selects the fastest working connection. Each proxy creates a TLS+WS inbound on the panel domain.', 'proxy.inboundHint': 'Traffic on this inbound exits through the selected proxy.',
   'proxy.add': 'Add proxy', 'proxy.host': 'Host (IP or domain)', 'proxy.port': 'Port', 'proxy.country': 'Country (optional)',
   'proxy.auth': 'Username & password (optional)', 'proxy.authHint': 'Leave this collapsed if the proxy needs no credentials.', 'proxy.username': 'Username', 'proxy.password': 'Password',
   'proxy.test': 'Test connection', 'proxy.testing': 'Testing', 'proxy.save': 'Save proxy', 'proxy.working': 'Working ✓', 'proxy.notWorking': 'Not working',
@@ -3124,6 +3065,9 @@ var liveInterval = null;
 var DASH_HISTORY = {cpu: [], ram: [], swap: [], disk: []};
 var DASH_IPS_VISIBLE = false;
 var DASH_IP_VALUES = {ipv4: '', ipv6: ''};
+var DASH_NET_PREVIOUS = null;
+var DASH_NET_HISTORY_LIMIT = 22;
+var DASH_NET_HISTORY = {download: [], upload: []};
 
 function startLiveStats() {
   if (liveInterval) clearInterval(liveInterval);
@@ -3159,11 +3103,72 @@ async function loadDashboard() {
     html += '<div class="ds-ip-row"><span>IPv4</span><b class="ds-ip-value" id="ds-ipv4">—</b></div>';
     html += '<div class="ds-ip-row"><span>IPv6</span><b class="ds-ip-value" id="ds-ipv6">—</b></div></div>';
     html += '</section>';
+    html += '<section class="panel dash-bandwidth-card"><div class="dash-bw-grid">';
+    html += dashBandwidthColumn('download', t('download'));
+    html += dashBandwidthColumn('upload', t('upload'));
+    html += '</div></section>';
     $id('dashboard-content').innerHTML = html;
     DASH_HISTORY = {cpu: [], ram: [], swap: [], disk: []};
     DASH_IPS_VISIBLE = false;
+    DASH_NET_PREVIOUS = null;
+    DASH_NET_HISTORY = {download: [], upload: []};
     startLiveStats();
   } catch(e) { $id('dashboard-content').innerHTML = '<div class="empty">' + t('errLoadStats') + '</div>'; }
+}
+
+function dashBandwidthColumn(key, label) {
+  return '<div class="dash-bw-col"><div class="dash-bw-heading"><strong id="ds-bw-' + key + '-rate">0.0</strong><span class="dash-bw-unit">Mb/s</span><span class="dash-bw-label">' + label + '</span><span class="dash-bw-marker" aria-hidden="true"></span></div>' +
+    '<div class="dash-bw-bars" id="ds-bw-' + key + '-bars" aria-hidden="true"></div><div class="dash-bw-peak" id="ds-bw-' + key + '-peak"></div></div>';
+}
+
+function dashFormatPeak(rate) {
+  var value = (Number(rate) || 0).toFixed(1);
+  return LANG === 'fa' ? 'اوج ' + value + ' Mb/s در ' + DASH_NET_HISTORY_LIMIT + ' نمونهٔ اخیر' : 'Peak ' + value + ' Mb/s in the last ' + DASH_NET_HISTORY_LIMIT + ' readings';
+}
+
+function renderDashBandwidthColumn(key) {
+  var history = DASH_NET_HISTORY[key] || [];
+  var current = history.length ? history[history.length - 1] : 0;
+  var peak = history.length ? Math.max.apply(Math, history) : 0;
+  var valueEl = $id('ds-bw-' + key + '-rate');
+  var peakEl = $id('ds-bw-' + key + '-peak');
+  var barsEl = $id('ds-bw-' + key + '-bars');
+  if (valueEl) valueEl.textContent = current.toFixed(1);
+  if (peakEl) peakEl.textContent = dashFormatPeak(peak);
+  if (!barsEl) return;
+  var max = Math.max(peak, 0.01);
+  var padding = Math.max(0, DASH_NET_HISTORY_LIMIT - history.length);
+  var bars = [];
+  for (var i = 0; i < DASH_NET_HISTORY_LIMIT; i++) {
+    var sampleIndex = i - padding;
+    var sample = sampleIndex >= 0 ? history[sampleIndex] : 0;
+    var height = sample > 0 ? Math.max(9, sample / max * 100) : 5;
+    bars.push('<span' + (i === DASH_NET_HISTORY_LIMIT - 1 ? ' class="current"' : '') + ' style="height:' + height.toFixed(1) + '%"></span>');
+  }
+  barsEl.innerHTML = bars.join('');
+}
+
+function updateDashBandwidth(stats) {
+  var sent = Number(stats.net_sent_bytes);
+  var received = Number(stats.net_recv_bytes);
+  if (!Number.isFinite(sent)) sent = (Number(stats.net_sent_mb) || 0) * 1024 * 1024;
+  if (!Number.isFinite(received)) received = (Number(stats.net_recv_mb) || 0) * 1024 * 1024;
+  var now = Date.now();
+  var rates = {download: 0, upload: 0};
+  if (DASH_NET_PREVIOUS) {
+    var elapsed = (now - DASH_NET_PREVIOUS.at) / 1000;
+    if (elapsed > 0 && elapsed <= 60) {
+      rates.download = Math.max(0, received - DASH_NET_PREVIOUS.received) * 8 / elapsed / 1000000;
+      rates.upload = Math.max(0, sent - DASH_NET_PREVIOUS.sent) * 8 / elapsed / 1000000;
+    }
+  }
+  DASH_NET_PREVIOUS = {at: now, sent: sent, received: received};
+  ['download', 'upload'].forEach(function(key) {
+    var history = DASH_NET_HISTORY[key];
+    history.push(rates[key]);
+    if (history.length > DASH_NET_HISTORY_LIMIT) history.shift();
+    renderDashBandwidthColumn(key);
+  });
 }
 
 function dashResourceRow(key, label, icon, color) {
@@ -3229,6 +3234,7 @@ async function refreshLiveStats() {
     var totalProto = tcp + udp, tcpPct = totalProto ? tcp * 100 / totalProto : 50;
     var tcpBar = $id('ds-tcp-bar'); if (tcpBar) tcpBar.style.width = tcpPct + '%';
     var udpBar = $id('ds-udp-bar'); if (udpBar) udpBar.style.width = (100 - tcpPct) + '%';
+    updateDashBandwidth(st);
     DASH_IP_VALUES.ipv4 = String(st.public_ipv4 || st.public_ip || '');
     DASH_IP_VALUES.ipv6 = String(st.public_ipv6 || '');
     renderDashIps();
@@ -3292,10 +3298,9 @@ function _userActions(u) {
 }
 
 function _userAccHead(u, idx) {
-  var inboundName = u.inbound_name || (u.inbound_id ? u.inbound_id.substring(0,8) : t('default'));
   return '<button type="button" class="spd-acc-head" onclick="spdToggleAcc(\'ua-' + u.user_id + '\',this)" aria-expanded="false">' +
     '<span class="spd-acc-title"><strong>' + esc(u.username) + '</strong></span>' +
-    '<span class="spd-acc-badges">' + _userStatus(u) + ' <span class="badge badge-b">' + esc(inboundName) + '</span>' + (u.proxy_country ? ' <span class="badge badge-p">' + esc(u.proxy_country) + '</span>' : '') + '</span>' +
+    '<span class="spd-acc-badges">' + _userStatus(u) + '</span>' +
     '<span class="material-symbols-outlined spd-acc-arrow">expand_more</span>' +
   '</button>';
 }
@@ -3579,7 +3584,18 @@ async function viewSub(configUuid) {
     console.error(e);
   }
 }
-function viewQR(userId) { $id('qr-img').src = '/api/users/' + userId + '/qr?t=' + Date.now(); openModal('mod-qr'); }
+var qrSubscriptionUrl = '';
+function viewQR(userId) {
+  var user = ALL_USERS.find(function(u) { return String(u.user_id) === String(userId); });
+  var configUuid = user && (user.config_uuid || user.subscription_uuid);
+  qrSubscriptionUrl = configUuid ? window.location.origin + '/link/' + encodeURIComponent(configUuid) : '';
+  $id('qr-img').src = '/api/users/' + encodeURIComponent(userId) + '/qr?t=' + Date.now();
+  openModal('mod-qr');
+}
+function openQrSubscription() {
+  if (!qrSubscriptionUrl) return;
+  window.open(qrSubscriptionUrl, '_blank', 'noopener,noreferrer');
+}
 
 // ─── Inbounds ───
 async function loadInbounds() {
@@ -4043,7 +4059,6 @@ var SELECTED_ADV_IB = '';
 
 function _advancedInboundTitle(ib) {
   if (ib && ib._managed_kind === 'default_tls_ws' && (!ib.advanced_customized || ib.name === 'پیش‌فرض TLS + WS')) return t('defaultTlsWsInbound');
-  if (ib && ib._managed_kind === 'default_http_ws' && (!ib.advanced_customized || ib.name === 'پیش‌فرض HTTP + WS')) return t('defaultHttpWsInbound');
   return (ib && ib.name) || (ib && ib.inbound_id) || t('inboundName');
 }
 
@@ -5683,18 +5698,8 @@ function pxToggleAdd(btn) {
   if (!opening) pxResetAdd();
 }
 
-function pxSetProto(p) {
-  PX_STATE.tested = null;
-  var pf = $id('px-protocol');
-  if (pf) pf.value = p;
-  ['socks5', 'http'].forEach(function(k) {
-    var b = $id('px-proto-' + k);
-    if (b) b.classList.toggle('on', k === p);
-  });
-  pxInvalidateTest();
-}
-
 function pxInvalidateTest() {
+  PX_STATE.tested = null;
   var out = $id('px-test-result');
   if (out) { out.classList.remove('show'); out.innerHTML = ''; }
   var sv = $id('px-save-btn');
@@ -5706,13 +5711,11 @@ function pxResetAdd() {
     var el = $id(id); if (el) el.value = '';
   });
   var port = $id('px-port'); if (port) port.value = '';
-  pxSetProto('socks5');
   pxInvalidateTest();
 }
 
 function pxTestPayload() {
   return {
-    protocol: ($id('px-protocol') || {}).value || 'socks5',
     host: (($id('px-host') || {}).value || '').trim(),
     port: parseInt(($id('px-port') || {}).value || '0', 10),
     username: (($id('px-username') || {}).value || '').trim(),
@@ -5725,6 +5728,7 @@ function pxTestHtml(r) {
   var ok = !!r.working;
   return '<b style="color:' + (ok ? 'var(--green)' : 'var(--red)') + '">' +
     (ok ? '✔ ' : '✖ ') + esc(ok ? t('proxy.working') : t('proxy.notWorking')) + '</b><br>' +
+    esc(t('proxy.protocol')) + ': <b dir="ltr">' + esc(r.protocol || '—') + '</b><br>' +
     esc(t('proxy.ping')) + ': <b dir="ltr">' + (r.ping_ms != null ? esc(String(r.ping_ms)) + ' ms' : '—') + '</b><br>' +
     esc(t('proxy.egress')) + ': <b dir="ltr">' + esc(r.egress_ip || '—') + '</b>' +
     (r.country_name ? '<br>' + esc(t('proxy.detectedCountry')) + ': <b>' + esc((r.country_flag || '') + ' ' + r.country_name) + '</b>' : '') +
@@ -5744,7 +5748,7 @@ async function pxTestNew() {
     if (out) out.innerHTML = pxTestHtml(r);
     if (r.working) {
       PX_STATE.tested = Object.assign({}, payload, {
-        working: true, ping_ms: r.ping_ms, egress_ip: r.egress_ip || '',
+        protocol: r.protocol || '', working: true, ping_ms: r.ping_ms, egress_ip: r.egress_ip || '',
         country_code: r.country_code || '', country_flag: r.country_flag || '', country_name: r.country_name || ''
       });
       if (sv) sv.classList.remove('hidden');
@@ -5890,7 +5894,6 @@ function cuInboundType(ib) {
 
 function inboundDisplayName(ib) {
   if (ib && ib._managed_kind === 'default_tls_ws' && (!ib.advanced_customized || ib.name === 'پیش‌فرض TLS + WS')) return t('defaultTlsWsInbound');
-  if (ib && ib._managed_kind === 'default_http_ws' && (!ib.advanced_customized || ib.name === 'پیش‌فرض HTTP + WS')) return t('defaultHttpWsInbound');
   return (ib && ib.name) || '';
 }
 
