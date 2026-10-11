@@ -24,6 +24,7 @@ CLI="/usr/local/bin/spiderpanel"
 
 XRAY="$APP_DIR/xray/xray"
 MTPROXY="/usr/local/bin/mtproto-proxy"
+TELEMT="/usr/local/bin/telemt"
 
 UV="/usr/local/bin/uv"
 
@@ -32,6 +33,7 @@ UV_VERSION="${SPIDER_UV_VERSION:-0.12.9}"
 
 # Xray version.
 XRAY_VERSION="${SPIDER_XRAY_VERSION:-26.3.27}"
+TELEMT_VERSION="${SPIDER_TELEMT_VERSION:-3.5.14}"
 
 TMP_ROOT=""
 
@@ -1207,6 +1209,81 @@ install_mtproxy() {
 
 
 # ============================================================
+# TELEGRAM WEB PROXY RUNTIME
+# ============================================================
+
+install_telemt() {
+
+    if [[ -x "$TELEMT" ]]; then
+        if "$TELEMT" --version 2>&1 | grep -Fq "$TELEMT_VERSION"; then
+            ok "Telemt WEB Proxy runtime ${TELEMT_VERSION} already installed."
+            return 0
+        fi
+        log "Updating Telemt WEB Proxy runtime to ${TELEMT_VERSION}..."
+    fi
+
+    local telemt_arch=""
+    local telemt_libc="gnu"
+    local telemt_asset=""
+    local telemt_url=""
+    local telemt_tmp=""
+    local telemt_expected=""
+    local telemt_actual=""
+
+    case "$(uname -m)" in
+        x86_64|aarch64) telemt_arch="$(uname -m)" ;;
+        *) warn "Telemt WEB Proxy supports x86_64 and aarch64 Linux only."; return 0 ;;
+    esac
+
+    if ldd --version 2>&1 | grep -qi musl; then
+        telemt_libc="musl"
+    fi
+
+    telemt_asset="telemt-${telemt_arch}-linux-${telemt_libc}.tar.gz"
+    telemt_url="https://github.com/telemt/telemt/releases/download/${TELEMT_VERSION}/${telemt_asset}"
+    telemt_tmp="$(mktemp -d /tmp/telemt.XXXXXX)"
+
+    log "Downloading Telemt ${TELEMT_VERSION} WEB Proxy runtime..."
+    if ! curl -fsSL --retry 3 --retry-delay 2 "$telemt_url" -o "$telemt_tmp/telemt.tar.gz" \
+        || ! curl -fsSL --retry 3 --retry-delay 2 "${telemt_url}.sha256" -o "$telemt_tmp/telemt.sha256"
+    then
+        rm -rf "$telemt_tmp"
+        warn "Telemt download failed; Web Proxy links will stay unavailable until Telemt is installed."
+        return 0
+    fi
+
+    telemt_expected="$(awk 'NR == 1 {print $1}' "$telemt_tmp/telemt.sha256")"
+    telemt_actual="$(sha256sum "$telemt_tmp/telemt.tar.gz" | awk '{print $1}')"
+    if [[ -z "$telemt_expected" || "$telemt_expected" != "$telemt_actual" ]]; then
+        rm -rf "$telemt_tmp"
+        warn "Telemt archive checksum did not match; skipping installation."
+        return 0
+    fi
+
+    if ! tar -xzf "$telemt_tmp/telemt.tar.gz" -C "$telemt_tmp" telemt \
+        || [[ ! -x "$telemt_tmp/telemt" ]]
+    then
+        rm -rf "$telemt_tmp"
+        warn "Telemt archive did not contain an executable binary."
+        return 0
+    fi
+
+    install -m 0755 "$telemt_tmp/telemt" "$TELEMT"
+    install -d -m 0755 /usr/local/share/licenses/telemt
+    if ! curl -fsSL "https://raw.githubusercontent.com/telemt/telemt/${TELEMT_VERSION}/LICENSE" \
+        -o /usr/local/share/licenses/telemt/LICENSE
+    then
+        rm -rf "$telemt_tmp"
+        warn "Telemt was installed, but its license text could not be downloaded."
+        return 0
+    fi
+
+    rm -rf "$telemt_tmp"
+    ok "Telemt WEB Proxy runtime installed."
+}
+
+
+# ============================================================
 # SYSTEMD SERVICE
 # ============================================================
 
@@ -1228,7 +1305,7 @@ WorkingDirectory=$APP_DIR
 EnvironmentFile=$ENV_FILE
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=/bin/sh -c 'exec $VENV/bin/uvicorn main:app --host 0.0.0.0 --port 8080'
+ExecStart=/bin/sh -c 'exec $VENV/bin/uvicorn main:app --host 0.0.0.0 --port 8080 --no-access-log'
 Restart=always
 RestartSec=5
 KillSignal=SIGINT
@@ -1319,6 +1396,7 @@ start_panel() {
             main:app \
             --host 0.0.0.0 \
             --port 8080 \
+            --no-access-log \
             >> "$LOGFILE" 2>&1 &
 
 
@@ -1888,6 +1966,8 @@ install_panel() {
     install_xray || true
 
     install_mtproxy || true
+
+    install_telemt || true
 
     config
 

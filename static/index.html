@@ -2270,7 +2270,7 @@ PAGE AND DATA CONTRACT
 
 PAGE BEHAVIOR
 - applyData populates the subscription URL and ID, active/inactive status, username, used/total/remaining traffic, usage percentage ring and bar, current/allowed connections, and remaining expiry in days, hours, and minutes. A zero traffic limit means unlimited; a missing expiry means no expiry.
-- renderConfigs groups links into TLS, Reality, and Telegram Proxy. Identify categories from the URI: Telegram proxy links begin with t.me/proxy or tg://proxy; Reality links contain security=reality; other configs belong to TLS. Translate category labels with the page's fa/en dictionaries.
+- renderConfigs groups links into TLS, Reality, and Telegram Proxy. Identify categories from the URI: Telegram proxy links begin with t.me/proxy, t.me/webproxy, tg://proxy, or tg://webproxy; Reality links contain security=reality; other configs belong to TLS. Translate category labels with the page's fa/en dictionaries.
 - Each config card shows its decoded remark and protocol and has copy and QR actions. Escape remarks before inserting them into HTML. Never insert server text as trusted markup.
 - The chips filter all/TLS/Reality/Telegram groups. Search filters by the decoded config name within the active category. Update group visibility and visible counts after either action.
 - Copy Subscription Link, Copy Sub Text, Copy All Configs, and per-config Copy use the Clipboard API with the existing textarea fallback. Keep localized success/error toast messages.
@@ -3437,13 +3437,14 @@ function renderEditInboundPicker(u) {
   ALL_IB.forEach(function(ib) {
     var id = ib.inbound_id;
     var selected = EU_INBOUND_PICKS[id] === true;
-    var proto = (ib.protocol || 'vless').toUpperCase();
-    var type = (ib.protocol || 'vless').toLowerCase();
+    var type = cuInboundType(ib);
+    var proto = type === 'webproxy' ? 'WEB PROXY' : (ib.protocol || 'vless').toUpperCase();
+    var meta = type === 'webproxy' ? 'WEB PROXY · HTTPS · TLS' : proto + ' · ' + (ib.network || 'ws') + ' · ' + (ib.security || 'tls');
     html += '<div class="ib-pick' + (selected ? ' selected' : '') + '" data-id="' + esc(id) + '" onclick="euToggleIbPick(this)">' +
       '<div class="ib-pick-ic"><span class="material-symbols-outlined">' + (type === 'worker' ? 'bolt' : 'cloud') + '</span></div>' +
       '<div class="ib-pick-info">' +
         '<div class="ib-pick-name">' + esc(inboundDisplayName(ib)) + '</div>' +
-        '<div class="ib-pick-meta">' + esc(proto + ' · ' + (ib.network || 'ws') + ' · ' + (ib.security || 'tls')) + '</div>' +
+        '<div class="ib-pick-meta">' + esc(meta) + '</div>' +
       '</div>' +
       '<div class="ib-pick-check"><span class="material-symbols-outlined">check</span></div>' +
     '</div>';
@@ -3612,11 +3613,17 @@ async function loadInbounds() {
 function _ibDetail(ib) {
   var proto = (ib.protocol || 'vless').toLowerCase();
   var d = '<div style="font-size:11px;color:var(--txt2);line-height:1.8">';
-  if (proto === 'telegram') {
+  if (ib._managed_kind === 'default_web_proxy') {
+    var ws = ib.web_proxy_settings || {};
+    d += 'Domain: ' + esc(ib.external_domain || ib.domain || '—') + '<br>';
+    d += 'Path: /' + esc(ws.base_path || '—') + '/<br>';
+    d += 'External Port: 443 (HTTPS)<br>';
+    d += 'Runtime: ' + (ib.web_proxy_runtime_ready ? 'Ready' : 'Unavailable');
+  } else if (proto === 'telegram') {
     var tg = ib.telegram_settings || {};
-    d += 'Domain: ' + (tg.external_domain || ib.external_domain || '—') + '<br>';
-    d += 'Internal Port: ' + (tg.internal_port || ib.port || '—') + '<br>';
-    d += 'External Port: ' + (tg.external_port || ib.external_port || '—');
+    d += 'Domain: ' + esc(tg.external_domain || ib.external_domain || '—') + '<br>';
+    d += 'Internal Port: ' + esc(tg.internal_port || ib.port || '—') + '<br>';
+    d += 'External Port: ' + esc(tg.external_port || ib.external_port || '—');
   } else if (proto === 'worker') {
     d += t('domain') + ': ' + (ib.external_domain || '—') + '<br>';
     d += t('port') + ': 443 (Worker)';
@@ -3642,17 +3649,19 @@ function renderInbounds() {
   for (var i = 0; i < ALL_IB.length; i++) {
     var ib = ALL_IB[i];
     var proto = (ib.protocol || 'vless').toLowerCase();
+    var isWebProxy = ib._managed_kind === 'default_web_proxy';
     var inboundTitle = inboundDisplayName(ib);
     var protoBadge = proto === 'reality' ? 'badge-p' : 'badge-b';
+    var protoLabel = isWebProxy ? 'WEB PROXY' : proto.toUpperCase();
     html += '<div class="spd-acc">' +
       '<button type="button" class="spd-acc-head" onclick="spdToggleAcc(\'ia-' + ib.inbound_id + '\',this)" aria-expanded="false">' +
         '<span class="spd-acc-title"><strong>' + esc(inboundTitle) + '</strong></span>' +
-        '<span class="spd-acc-badges"><span class="badge ' + protoBadge + '">' + proto.toUpperCase() + '</span></span>' +
+        '<span class="spd-acc-badges"><span class="badge ' + protoBadge + '">' + protoLabel + '</span></span>' +
         '<span class="material-symbols-outlined spd-acc-arrow">expand_more</span>' +
       '</button>' +
       '<div class="spd-acc-body" id="acc-ia-' + ib.inbound_id + '">' +
         _ibDetail(ib) +
-        (ib.proxy_managed ? '' : '<div class="spd-acc-btns">' +
+        ((ib.proxy_managed || isWebProxy) ? '' : '<div class="spd-acc-btns">' +
           '<button class="btn btn-sm btn-g" onclick="editInbound(\'' + ib.inbound_id + '\')">' + t('edit') + '</button>' +
           ((ib.system || ib.inbound_id === 'Node') ? '' : '<button class="btn btn-sm btn-g" onclick="deleteInbound(\'' + ib.inbound_id + '\')">' + t('delete') + '</button>') +
         '</div>') +
@@ -5887,6 +5896,7 @@ function cuWorkerProxies() {
 
 function cuInboundType(ib) {
   var p = (ib && ib.protocol || '').toLowerCase();
+  if (ib && ib._managed_kind === 'default_web_proxy') return 'webproxy';
   if (p === 'worker') return 'worker';
   if (p === 'telegram') return 'telegram';
   if (p === 'reality' || (ib && ib.security || '').toLowerCase() === 'reality') return 'reality';
@@ -5894,6 +5904,7 @@ function cuInboundType(ib) {
 }
 
 function inboundDisplayName(ib) {
+  if (ib && ib._managed_kind === 'default_web_proxy') return 'Web Proxy';
   if (ib && ib._managed_kind === 'default_tls_ws' && (!ib.advanced_customized || ib.name === 'پیش‌فرض TLS + WS')) return t('defaultTlsWsInbound');
   return (ib && ib.name) || '';
 }
@@ -5955,8 +5966,8 @@ function cuRenderInboundOpts() {
     var id = ib.inbound_id;
     var selected = cuInboundState.picks[id] === true;
     var type = cuInboundType(ib);
-    var proto = (ib.protocol || 'vless').toUpperCase();
-    var meta = proto + ' · ' + (ib.network || 'ws').toUpperCase() + ' · ' + (ib.security || 'tls').toUpperCase();
+    var proto = type === 'webproxy' ? 'WEB PROXY' : (ib.protocol || 'vless').toUpperCase();
+    var meta = type === 'webproxy' ? 'WEB PROXY · HTTPS · TLS' : proto + ' · ' + (ib.network || 'ws').toUpperCase() + ' · ' + (ib.security || 'tls').toUpperCase();
     html += '<div class="ib-pick' + (selected ? ' selected' : '') + '" data-id="' + esc(id) + '" onclick="cuToggleIbPick(this)">' +
       '<div class="ib-pick-ic"><span class="material-symbols-outlined">' + (type === 'worker' ? 'bolt' : type === 'reality' ? 'shield' : 'cloud') + '</span></div>' +
       '<div class="ib-pick-info">' +
