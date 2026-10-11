@@ -1384,7 +1384,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
   function configCategory(link) {
     var l = String(link || '').toLowerCase();
-    if (l.indexOf('t.me/proxy?') === 0 || l.indexOf('https://t.me/proxy?') === 0 || l.indexOf('tg://proxy') === 0) return 'telegram';
+    // Standard MTProxy and Web Proxy links (dd-prefixed per-user secret) both
+    // belong to Telegram Proxy, not the generic TLS group.
+    if (l.indexOf('t.me/webproxy') >= 0 || l.indexOf('tg://webproxy') === 0 ||
+        l.indexOf('t.me/proxy') >= 0 || l.indexOf('tg://proxy') === 0 ||
+        l.indexOf('secret=dd') >= 0 || l.indexOf('secret%3ddd') >= 0 ||
+        l.indexOf('/?bridge=') >= 0 || l.indexOf('?bridge=') >= 0) return 'telegram';
     if (l.indexOf('security=reality') >= 0 || l.indexOf('security%3dreality') >= 0) return 'reality';
     return 'tls';
   }

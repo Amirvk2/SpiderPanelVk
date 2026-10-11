@@ -127,6 +127,12 @@ Panel
 
 The project also exposes QR endpoints for subscription/user configuration delivery.
 
+### Telegram Web Proxy inbound
+
+SpiderPanel includes a managed **`web proxy`** inbound for Telegram Web Proxy. It reuses the panel's public HTTPS/WebSocket endpoint on port `443` and does not open a separate listener. Assign the inbound to a user to generate and persist a dedicated 16-byte secret; the subscription receives a `https://t.me/webproxy?secret=dd…&server=<panel-host>` link. The public bridge, short-lived session bootstrap, authenticated WebSocket relay and per-user traffic accounting are handled by `twp.py` and the panel routes.
+
+For a deployment with multiple replicas sharing the same hostname, configure the same `SPIDER_TWP_SIGNING_KEY` (at least 16 characters) on every replica, and use persistent shared state for user/inbound data. A single instance can generate and persist its own signing key under `DATA_DIR`.
+
 ---
 
 # 🤖 Telegram automation

@@ -1066,7 +1066,7 @@ tr{animation:fadeIn .3s ease}
 /* Main requested accordion */
 .nav-accordion{border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;background:#000;box-shadow:none;margin:2px 0 4px}
 .nav-accordion-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px;background:#000;color:#fff;border:0;border-bottom:1px solid #2a2a2a;font:600 13px inherit;cursor:pointer}
-.nav-accordion-title{display:inline-flex;align-items:center;gap:8px}.nav-accordion-ic{font-size:18px}.nav-accordion-arrow{font-size:19px;transition:transform .2s}.nav-accordion-body{max-height:0;overflow:hidden;transition:max-height .25s ease;background:#000}.nav-accordion.open .nav-accordion-body{max-height:520px}.nav-accordion.open .nav-accordion-arrow{transform:rotate(180deg)}.nav-accordion-body .nav-item{border-radius:0!important;border:0!important;border-bottom:1px solid #1d1d1d!important;background:#000!important;margin:0!important}.nav-accordion-body .nav-item:last-child{border-bottom:0!important}.nav-accordion-body .nav-item.active{background:#000!important;color:#fff!important;box-shadow:inset 3px 0 0 #fff}.nav-accordion-body .nav-item:hover{background:#000!important}
+.nav-accordion-title{display:inline-flex;align-items:center;gap:8px}.nav-accordion-ic{font-size:18px}.nav-accordion-arrow{font-size:19px;transition:transform .2s}.nav-accordion-body{max-height:0;overflow-x:hidden;overflow-y:hidden;overscroll-behavior:contain;transition:max-height .25s ease;background:#000}.nav-accordion.open .nav-accordion-body{max-height:min(520px, calc(100vh - 190px));overflow-y:auto; scrollbar-width:thin; scrollbar-color:#555 transparent; -webkit-overflow-scrolling:touch}.nav-accordion.open .nav-accordion-body::-webkit-scrollbar{width:5px}.nav-accordion.open .nav-accordion-body::-webkit-scrollbar-thumb{background:#555;border-radius:8px}.nav-accordion.open .nav-accordion-body::-webkit-scrollbar-track{background:transparent}.nav-accordion.open .nav-item{flex-shrink:0}.nav-accordion.open .nav-accordion-arrow{transform:rotate(180deg)}.nav-accordion-body .nav-item{border-radius:0!important;border:0!important;border-bottom:1px solid #1d1d1d!important;background:#000!important;margin:0!important}.nav-accordion-body .nav-item:last-child{border-bottom:0!important}.nav-accordion-body .nav-item.active{background:#000!important;color:#fff!important;box-shadow:inset 3px 0 0 #fff}.nav-accordion-body .nav-item:hover{background:#000!important}
 [data-theme="light"] .nav-accordion{background:#fff;border-color:#cfcfcf;box-shadow:none}[data-theme="light"] .nav-accordion-head{background:#fff;color:#000;border-color:#d8d8d8}[data-theme="light"] .nav-accordion-body{background:#fff}[data-theme="light"] .nav-accordion-body .nav-item{background:#fff!important;border-bottom-color:#e6e6e6!important;color:#333}[data-theme="light"] .nav-accordion-body .nav-item.active{background:#fff!important;color:#000!important;box-shadow:inset 3px 0 0 #000}
 
 /* Node selector inside Node inbound editor */
@@ -2383,6 +2383,7 @@ IMPLEMENTATION RULES
       <div class="f-g"><label data-i18n="inboundType">Inbound Type</label><select id="ib-inbound-type" onchange="onInboundTypeChange()">
         <option value="config">Config</option>
         <option value="telegram">Telegram Proxy</option>
+        <option value="web_proxy">Web Proxy</option>
       </select></div>
     </div>
 
@@ -2440,8 +2441,15 @@ IMPLEMENTATION RULES
       <div id="ib-tg-railway-info" class="px-hint" style="margin-top:-4px">External Domain/Port entered for this Telegram inbound are authoritative. Railway TCP values are shown only as advisory.</div>
     </div>
 
+    <!-- Telegram Web Proxy fields -->
+    <div id="ib-webproxy-fields" class="hidden">
+      <div class="divider"></div>
+      <div style="font-size:11px;color:var(--neon);font-weight:700;margin-bottom:8px">Web Proxy · Telegram</div>
+      <div class="px-hint">از HTTPS و WebSocket دامنه عمومی خود پنل روی پورت 443 استفاده می‌کند؛ listener یا پورت مجزا نیاز ندارد. برای هر کاربر secret جدا ساخته می‌شود.</div>
+    </div>
+
     <!-- Network group -->
-    <div class="divider"></div>
+    <div class="divider" id="ib-network-divider"></div>
     <div id="ib-net-wrap">
       <div class="f-g"><label data-i18n="network">نوع انتقال (Transport)</label><select id="ib-network" onchange="onNetworkChange()">
         <option value="tcp">TCP</option>
@@ -3617,6 +3625,8 @@ function _ibDetail(ib) {
     d += 'Domain: ' + (tg.external_domain || ib.external_domain || '—') + '<br>';
     d += 'Internal Port: ' + (tg.internal_port || ib.port || '—') + '<br>';
     d += 'External Port: ' + (tg.external_port || ib.external_port || '—');
+  } else if (proto === 'web_proxy') {
+    d += 'Endpoint: ' + (ib.external_domain || ib.domain || 'دامنه پنل') + ':443<br>HTTPS + WebSocket<br>Secret: per-user';
   } else if (proto === 'worker') {
     d += t('domain') + ': ' + (ib.external_domain || '—') + '<br>';
     d += t('port') + ': 443 (Worker)';
@@ -3627,7 +3637,7 @@ function _ibDetail(ib) {
     d += t('domain') + ': ' + (ib.external_domain || '—') + ' (خودکار)<br>';
     d += t('port') + ': 443 / relay';
   }
-  if (proto !== 'telegram') {
+  if (proto !== 'telegram' && proto !== 'web_proxy') {
     d += '<br>' + t('secNetwork') + ': ' + (ib.network || 'tcp') + ' | ' + t('security') + ': ' + (ib.security || 'none');
   }
   d += '<br>' + t('usersCount') + ': ' + (ib.users_count || 0);
@@ -3654,7 +3664,7 @@ function renderInbounds() {
         _ibDetail(ib) +
         (ib.proxy_managed ? '' : '<div class="spd-acc-btns">' +
           '<button class="btn btn-sm btn-g" onclick="editInbound(\'' + ib.inbound_id + '\')">' + t('edit') + '</button>' +
-          ((ib.system || ib.inbound_id === 'Node') ? '' : '<button class="btn btn-sm btn-g" onclick="deleteInbound(\'' + ib.inbound_id + '\')">' + t('delete') + '</button>') +
+          ((ib.system || ib.inbound_id === 'Node' || ib._managed_kind === 'default_web_proxy') ? '' : '<button class="btn btn-sm btn-g" onclick="deleteInbound(\'' + ib.inbound_id + '\')">' + t('delete') + '</button>') +
         '</div>') +
       '</div>' +
     '</div>';
@@ -3716,11 +3726,14 @@ async function loadTelegramRailwayInfo(){
 function onInboundTypeChange() {
   var type = $id('ib-inbound-type').value;
   var isTg = type === 'telegram';
+  var isWebProxy = type === 'web_proxy';
   var isConfig = type === 'config';
   toggleById('ib-tls-fields', isConfig);
   toggleById('ib-net-wrap', isConfig);
   toggleById('ib-internal-port-wrap', isConfig);
   toggleById('ib-tg-fields', isTg);
+  toggleById('ib-webproxy-fields', isWebProxy);
+  toggleById('ib-network-divider', isConfig || isTg);
   if (isTg) loadTelegramRailwayInfo();
 }
 
@@ -3880,12 +3893,13 @@ async function editInbound(iid) {
   if (!ib) return;
   var isReality = (ib.protocol === 'reality' || ib.security === 'reality');
   var isTg = (ib.protocol || '').toLowerCase() === 'telegram';
+  var isWebProxy = (ib.protocol || '').toLowerCase() === 'web_proxy';
   var isNode = ((ib.protocol || '').toLowerCase() === 'node' || ib.inbound_id === 'Node' || ib.system === true);
   var modal = $id('mod-inbound');
   $id('ib-title').textContent = t('editInbound');
   $id('ib-id').value = iid;
   $id('ib-name').value = ib.name || '';
-  $id('ib-inbound-type').value = isTg ? 'telegram' : 'config';
+  $id('ib-inbound-type').value = isTg ? 'telegram' : (isWebProxy ? 'web_proxy' : 'config');
   $id('ib-sni').value = ib.sni || 'is1-ssl.mzstatic.com';
   var rs = ib.reality_settings || {};
   $id('ib-privkey').value = (rs || {}).private_key || '';
@@ -3927,6 +3941,11 @@ async function editInbound(iid) {
     $id('ib-submit').textContent = t('updateInbound');
     onInboundTypeChange();
     openModal('mod-inbound');
+  } else if (isWebProxy) {
+    $id('ib-inbound-type').value = 'web_proxy';
+    $id('ib-submit').textContent = t('updateInbound');
+    onInboundTypeChange();
+    openModal('mod-inbound');
   } else if (isReality) {
     // Reality: user fills domain + ports; pbk is auto-generated.
     $id('ib-security').value = 'reality';
@@ -3962,7 +3981,7 @@ async function submitInbound(e) {
   btn.textContent = t('saving');
   var iid = $id('ib-id').value;
   var type = $id('ib-inbound-type').value;
-  var proto = type === 'telegram' ? 'telegram' : 'vless';
+  var proto = type === 'telegram' ? 'telegram' : (type === 'web_proxy' ? 'web_proxy' : 'vless');
 
   // Collect selected node IDs for Inbound "Node"
   var nodeIds = [];
@@ -3997,6 +4016,9 @@ async function submitInbound(e) {
     body.port = internalPort;
     body.external_port = externalPort;
     body.external_domain = $id('ib-tg-domain').value || '';
+  } else if (type === 'web_proxy') {
+    body.protocol = 'web_proxy';
+    body.inbound_type = 'telegram_web_proxy';
   } else {
     // VLESS / TLS / Reality
     var network = $id('ib-network').value;
@@ -4067,7 +4089,7 @@ async function loadAdvancedInbounds() {
     var d = await api('/api/inbounds');
     ALL_ADV_IB = (d.inbounds || []).filter(function(ib) {
       var p = String(ib.protocol || '').toLowerCase();
-      return p !== 'node' && p !== 'telegram';
+      return p !== 'node' && p !== 'telegram' && p !== 'web_proxy';
     });
     if (!ALL_ADV_IB.some(function(ib) { return ib.inbound_id === SELECTED_ADV_IB; })) SELECTED_ADV_IB = '';
     renderAdvancedInboundList();

@@ -98,6 +98,25 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 DATA_FILE = DATA_DIR / "spider_state.json"
 SAVE_LOCK = asyncio.Lock()
 
+# Telegram Web Proxy runs over this panel's existing HTTPS/WSS endpoint.
+# Its signing key is persistent across restarts and replicas should share
+# SPIDER_TWP_SIGNING_KEY when they share the same public endpoint.
+from twp import (
+    SigningKeyStore, SessionRegistry, WELCOME_FRAME, MAX_WS_MESSAGE,
+    parse_frames as twp_parse_frames, is_hello as twp_is_hello,
+    parse_proxy_secret as twp_parse_proxy_secret,
+    create_bootstrap_token as twp_create_bootstrap_token,
+    verify_bootstrap_token as twp_verify_bootstrap_token,
+    verify_session_token as twp_verify_session_token,
+    capability_matches as twp_capability_matches,
+    render_bridge_page as twp_render_bridge_page,
+    bridge_csp as twp_bridge_csp,
+)
+TWP_SIGNING_STORE = SigningKeyStore(DATA_DIR)
+TWP_SESSIONS = SessionRegistry(TWP_SIGNING_STORE.get)
+TWP_CLEANUP_TASK = None
+TWP_LAST_SAVE = {}
+
 # ── Official MTProxy runtime paths/settings ──────────────────────────────────
 # Every Telegram inbound owns one MTProxy process. The process listens on the
 # inbound's Internal Port (-H). Its statistics socket is localhost-only and
@@ -1048,14 +1067,18 @@ async def _ensure_xray() -> bool:
 # ── Startup / Shutdown ────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup():
-    global http_client
+    global http_client, TWP_CLEANUP_TASK
     limits = httpx.Limits(max_connections=500, max_keepalive_connections=100)
     timeout = httpx.Timeout(30.0, connect=10.0)
     http_client = httpx.AsyncClient(
         limits=limits, timeout=timeout, follow_redirects=True,
     )
     await load_state()
-    # Warm the GitHub announcement cache during startup so the Notifications
+    if TWP_SIGNING_STORE.get():
+        TWP_CLEANUP_TASK = asyncio.create_task(_twp_cleanup_loop(), name="spider-twp-session-cleanup")
+    else:
+        logger.error("Telegram Web Proxy is not ready: %s", TWP_SIGNING_STORE.error)
+    # Warm the GitHub announcement cache during startup.
     # tab is ready on first open. This task is isolated from panel startup.
     asyncio.create_task(_prime_notifications(), name="spider-notif-prefetch")
     # Learn the public endpoint from platform variables before generating any
@@ -1094,6 +1117,47 @@ async def startup():
                 ib["external_domain"] = ""
                 ib["external_port"] = ""
                 ib.setdefault("ws_settings", {"path": "/ws/{uuid}"})
+
+        # Managed Telegram Web Proxy: it uses the panel's existing public
+        # HTTPS + WebSocket entry point, so it does not bind an extra port.
+        web_proxy_iid = next((
+            iid for iid, ib in INBOUNDS.items()
+            if str(ib.get("_managed_kind") or "") == "default_web_proxy"
+            or (str(ib.get("protocol") or "").lower() == "web_proxy"
+                and str(ib.get("name") or "").strip().lower() == "web proxy")
+        ), None)
+        if not web_proxy_iid:
+            web_proxy_iid = "default-web-proxy" if "default-web-proxy" not in INBOUNDS else generate_short_id()
+            web_proxy_host = _safe_host(SETTINGS.get("domain"), get_host())
+            INBOUNDS[web_proxy_iid] = {
+                "name": "web proxy",
+                "_managed_kind": "default_web_proxy",
+                "protocol": "web_proxy",
+                "inbound_type": "telegram_web_proxy",
+                "port": 443,
+                "network": "ws",
+                "security": "tls",
+                "domain": web_proxy_host,
+                "external_domain": web_proxy_host,
+                "external_port": 443,
+                "telegram_settings": {},
+                "created_at": datetime.now().isoformat(),
+            }
+            asyncio.create_task(save_state())
+            log_activity("inbound", "اینباند پیش‌فرض web proxy ساخته شد", "ok")
+        else:
+            web_proxy_ib = INBOUNDS[web_proxy_iid]
+            web_proxy_ib.setdefault("_managed_kind", "default_web_proxy")
+            if not web_proxy_ib.get("advanced_customized"):
+                web_proxy_ib.update({
+                    "name": "web proxy", "protocol": "web_proxy",
+                    "inbound_type": "telegram_web_proxy", "port": 443,
+                    "network": "ws", "security": "tls",
+                    "domain": _safe_host(SETTINGS.get("domain"), get_host()),
+                    "external_domain": _safe_host(SETTINGS.get("domain"), get_host()),
+                    "external_port": 443, "telegram_settings": {},
+                })
+
         # Retire the old managed cleartext HTTP+WS default. Users that selected
         # it are moved to the managed TLS+WS inbound so their links keep working.
         retired_http_ids = {
@@ -1281,6 +1345,15 @@ async def startup():
             _tg_secret = str(_u.get("telegram_secret") or "").strip().lower()
             if not SECRET_RE.fullmatch(_tg_secret):
                 _u["telegram_secret"] = derive_secret_from_uuid(_u.get("config_uuid"))
+                _changed = True
+        _has_web_proxy = any(
+            (INBOUNDS.get(iid, {}).get("protocol") or "").lower() == "web_proxy"
+            for iid in _iids
+        )
+        if _has_web_proxy:
+            _web_secret = str(_u.get("web_proxy_secret") or "").strip().lower()
+            if not re.fullmatch(r"[0-9a-f]{32}", _web_secret):
+                _u["web_proxy_secret"] = secrets.token_hex(16)
                 _changed = True
 
     # Backfill placeholder domains on any pre-existing inbounds so configs never
@@ -1694,7 +1767,7 @@ async def _worker_auto_sync_loop():
 
 @app.on_event("shutdown")
 async def shutdown():
-    global BOT_SCHEDULER_TASK, BOT_POLL_TASK
+    global BOT_SCHEDULER_TASK, BOT_POLL_TASK, TWP_CLEANUP_TASK
     for _task_name in ("BOT_SCHEDULER_TASK", "BOT_POLL_TASK"):
         _task = globals().get(_task_name)
         if _task and not _task.done():
@@ -1728,6 +1801,15 @@ async def shutdown():
         except asyncio.CancelledError:
             pass
         NODE_HEARTBEAT_TASK = None
+    # Stop Web Proxy relay sessions/tasks before closing the application client.
+    if TWP_CLEANUP_TASK is not None and not TWP_CLEANUP_TASK.done():
+        TWP_CLEANUP_TASK.cancel()
+        try:
+            await TWP_CLEANUP_TASK
+        except asyncio.CancelledError:
+            pass
+        TWP_CLEANUP_TASK = None
+    await TWP_SESSIONS.shutdown_all("panel_shutdown")
     # Stop all Telegram Proxy instances
     for iid in list(TG_PROXY_INSTANCES.keys()):
         await _stop_telegram_proxy(iid)
@@ -2694,6 +2776,26 @@ def generate_user_config(user_id: str, user: dict, inbound_id: str = None, addr:
             return ""
         return generate_telegram_proxy_link(user_id, user, inbound, remark_tag)
 
+    # ── TELEGRAM WEB PROXY (TWP over this panel's HTTPS/WSS endpoint) ──
+    if proto == "web_proxy":
+        if not inbound or not panel_domain:
+            return ""
+        secret = str(user.get("web_proxy_secret") or "").strip().lower()
+        if not re.fullmatch(r"[0-9a-f]{32}", secret):
+            secret = secrets.token_hex(16)
+            user["web_proxy_secret"] = secret
+            global_user = USERS.get(user_id)
+            if global_user is not None:
+                global_user["web_proxy_secret"] = secret
+            try:
+                asyncio.get_running_loop().create_task(save_state())
+            except RuntimeError:
+                pass
+        # Telegram Web Proxy uses the dedicated /webproxy deep-link format.
+        # Keep `dd` in the exported secret so clients derive the same bridge
+        # capability; twp_parse_proxy_secret strips it only for the MTProxy AES handshake.
+        return f"https://t.me/webproxy?secret=dd{secret}&server={quote(panel_domain, safe='.-')}"
+
     # ── REALITY (served by Xray core) ──
     if proto == "reality" or sec == "reality":
         # Not configured yet (admin must fill domain + port) → no config.
@@ -3452,8 +3554,59 @@ TGProxy = MTProtoProxyServer
 
 
 @app.get("/")
-async def root():
-    return {"service": "Spider Gateway", "version": "10.1", "status": "active"}
+async def root(request: Request):
+    bridge_values = request.query_params.getlist("bridge")
+    if not bridge_values and "bridge" not in request.query_params:
+        return {"service": "Spider Gateway", "version": "10.1", "status": "active"}
+    # A bridge request must have exactly one query parameter and one valid
+    # capability. Reject duplicate/extra values instead of accepting ambiguous URLs.
+    if (len(request.query_params.multi_items()) != 1 or len(bridge_values) != 1
+            or not re.fullmatch(r"[A-Za-z0-9_-]{43}", bridge_values[0] or "")):
+        raise HTTPException(status_code=404, detail="Web Proxy bridge not found")
+    capability = bridge_values[0]
+
+    host = (request.url.hostname or get_host() or "").strip().lower().rstrip(".")
+    if not host:
+        raise HTTPException(status_code=503, detail="Web Proxy public hostname is not configured")
+    key = TWP_SIGNING_STORE.get()
+    if not key:
+        raise HTTPException(status_code=503, detail="Web Proxy signing key is not ready")
+
+    matched_user_id = None
+    async with USERS_LOCK:
+        candidates = [(str(uid), dict(user)) for uid, user in USERS.items()]
+    for candidate_uid, candidate_user in candidates:
+        if not is_user_allowed(candidate_user):
+            continue
+        selected = candidate_user.get("inbound_ids") or ([candidate_user.get("inbound_id")] if candidate_user.get("inbound_id") else [])
+        if not any((INBOUNDS.get(str(iid), {}).get("protocol") or "").lower() == "web_proxy" for iid in selected):
+            continue
+        stored_secret = str(candidate_user.get("web_proxy_secret") or "").strip().lower()
+        if not re.fullmatch(r"[0-9a-f]{32}", stored_secret):
+            continue
+        # For Web Proxy, the leading dd mode byte participates in the HMAC key
+        # even though the inner MTProxy handshake uses the 16-byte secret alone.
+        bridge_secret = bytes.fromhex("dd" + stored_secret)
+        if twp_capability_matches(capability, bridge_secret, host):
+            matched_user_id = candidate_uid
+            break
+    if not matched_user_id:
+        raise HTTPException(status_code=404, detail="Web Proxy bridge not found")
+
+    bootstrap = twp_create_bootstrap_token(key, matched_user_id, host)
+    html = twp_render_bridge_page(host, bootstrap)
+    nonce_match = re.search(r'<script nonce="([^"]+)"', html)
+    nonce = nonce_match.group(1) if nonce_match else ""
+    return HTMLResponse(
+        content=html,
+        headers={
+            "Content-Security-Policy": twp_bridge_csp(host, nonce),
+            "Cache-Control": "no-store, max-age=0",
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff",
+            "Referrer-Policy": "no-referrer",
+        },
+    )
 
 
 @app.get("/healthz")
@@ -4717,6 +4870,169 @@ async def reverse_ws_handler(ws: WebSocket, uuid: str):
     await websocket_tunnel(ws, uuid, expected_relay_inbound_id=rid)
 
 
+async def _twp_authorized_user(user_id: str) -> dict | None:
+    """Return a currently authorised user assigned to at least one Web Proxy inbound."""
+    async with USERS_LOCK:
+        user = USERS.get(str(user_id))
+        snapshot = dict(user) if user else None
+    if not snapshot or not is_user_allowed(snapshot):
+        return None
+    selected = snapshot.get("inbound_ids") or ([snapshot.get("inbound_id")] if snapshot.get("inbound_id") else [])
+    if not any((INBOUNDS.get(str(iid), {}).get("protocol") or "").lower() == "web_proxy" for iid in selected):
+        return None
+    try:
+        twp_parse_proxy_secret(snapshot.get("web_proxy_secret"))
+    except ValueError:
+        return None
+    return snapshot
+
+
+def _twp_record_bytes(user_id: str, uplink: int, downlink: int) -> None:
+    """Bridge TWP relay traffic into SpiderPanel's shared per-user quota."""
+    amount = max(0, int(uplink or 0)) + max(0, int(downlink or 0))
+    if not amount:
+        return
+    async def _apply():
+        total = None
+        limit = 0
+        async with USERS_LOCK:
+            user = USERS.get(str(user_id))
+            if user is not None:
+                user["traffic_used_bytes"] = int(user.get("traffic_used_bytes") or 0) + amount
+                total = int(user["traffic_used_bytes"])
+                limit = int(user.get("traffic_limit_bytes") or 0)
+                config_uuid = str(user.get("config_uuid") or "")
+            else:
+                config_uuid = ""
+        stats["total_bytes"] += amount
+        hourly_traffic[now_ir().strftime("%H:00")] += amount
+        if config_uuid and total is not None:
+            async with LINKS_LOCK:
+                link = LINKS.get(config_uuid)
+                if link is not None:
+                    link["used_bytes"] = total
+        now = time.monotonic()
+        if now - float(TWP_LAST_SAVE.get(str(user_id), 0)) >= 5:
+            TWP_LAST_SAVE[str(user_id)] = now
+            asyncio.create_task(save_state())
+        # Immediately cut off existing Web Proxy sessions when the shared user
+        # quota is reached; the usual authorization check only applies to new sessions.
+        if total is not None and limit > 0 and total >= limit:
+            await TWP_SESSIONS.drop_user(str(user_id), "traffic_limit_reached")
+    try:
+        asyncio.get_running_loop().create_task(_apply())
+    except RuntimeError:
+        pass
+
+
+async def _twp_cleanup_loop():
+    while True:
+        try:
+            await asyncio.sleep(30)
+            await TWP_SESSIONS.purge_expired()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.debug("TWP session cleanup failed: %s", exc)
+
+
+@app.post("/api/v1/session")
+async def twp_create_session(request: Request):
+    """Exchange a short-lived user bootstrap token and HELLO for a session."""
+    host = (request.url.hostname or get_host() or "").strip().lower().rstrip(".")
+    auth_header = str(request.headers.get("authorization") or "")
+    token = auth_header[7:].strip() if auth_header.lower().startswith("bearer ") else ""
+    key = TWP_SIGNING_STORE.get()
+    user_id = twp_verify_bootstrap_token(key, token, host) if key else None
+    if not user_id:
+        raise HTTPException(status_code=401, detail="invalid bootstrap token")
+    user = await _twp_authorized_user(user_id)
+    if not user:
+        raise HTTPException(status_code=403, detail="Web Proxy is not assigned or active")
+    packet = await request.body()
+    try:
+        valid_hello = len(packet) <= 1024 and twp_is_hello(twp_parse_frames(packet))
+    except (ValueError, TypeError):
+        valid_hello = False
+    if not valid_hello:
+        raise HTTPException(status_code=400, detail="invalid Web Proxy HELLO")
+    try:
+        secret = twp_parse_proxy_secret(user.get("web_proxy_secret"))
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Web Proxy secret is invalid")
+    session = await TWP_SESSIONS.create(
+        host, user_id, secret,
+        on_bytes=_twp_record_bytes,
+    )
+    if session is None:
+        raise HTTPException(status_code=503, detail="Web Proxy signing key is not ready")
+    return Response(
+        content=WELCOME_FRAME,
+        media_type="application/octet-stream",
+        headers={
+            "X-Carrier-Mode": "websocket",
+            "X-Session-Token": session.token,
+            "Cache-Control": "no-store, max-age=0",
+            "Pragma": "no-cache",
+        },
+    )
+
+
+@app.websocket("/api/v1/ws")
+async def twp_websocket_handler(ws: WebSocket):
+    """Serve framed Telegram Web Proxy data over an authenticated WebSocket."""
+    host = (ws.url.hostname or get_host() or "").strip().lower().rstrip(".")
+    offered = list(ws.scope.get("subprotocols") or [])
+    protocol = next((p for p in offered if p.startswith("tproxy-v1.")), "")
+    token = protocol[len("tproxy-v1."):] if protocol else ""
+    key = TWP_SIGNING_STORE.get()
+    if not key or not twp_verify_session_token(key, host, token):
+        await ws.close(code=1008, reason="invalid session")
+        return
+    session = await TWP_SESSIONS.get(token)
+    if not session or session.host != host or not await _twp_authorized_user(session.user_id):
+        await TWP_SESSIONS.drop(token, "unauthorised")
+        await ws.close(code=1008, reason="unauthorised session")
+        return
+
+    async def send_frame(data: bytes):
+        await ws.send_bytes(data)
+
+    session._send = send_frame
+    await ws.accept(subprotocol=protocol)
+    try:
+        while not session.closed:
+            message = await ws.receive()
+            if message.get("type") == "websocket.disconnect":
+                break
+            data = message.get("bytes")
+            if data is None:
+                await session.protocol_error("text_frame_not_allowed")
+                break
+            await session.on_ws_message(data)
+    except WebSocketDisconnect:
+        pass
+    except Exception as exc:
+        logger.debug("TWP WebSocket ended user=%s: %s", session.user_id, exc)
+    finally:
+        await TWP_SESSIONS.drop(token, "websocket_closed")
+
+
+@app.delete("/api/v1/session")
+async def twp_delete_session(request: Request):
+    host = (request.url.hostname or get_host() or "").strip().lower().rstrip(".")
+    auth_header = str(request.headers.get("authorization") or "")
+    token = auth_header[7:].strip() if auth_header.lower().startswith("bearer ") else ""
+    key = TWP_SIGNING_STORE.get()
+    if not key or not twp_verify_session_token(key, host, token):
+        raise HTTPException(status_code=401, detail="invalid session token")
+    session = await TWP_SESSIONS.get(token)
+    if not session or session.host != host:
+        raise HTTPException(status_code=404, detail="session not found")
+    await TWP_SESSIONS.drop(token, "client_closed")
+    return Response(status_code=204, headers={"Cache-Control": "no-store"})
+
+
 @app.websocket("/{path:path}")
 async def managed_ws_template_handler(ws: WebSocket, path: str):
     """Route edited managed-inbound paths that retain a {uuid} placeholder."""
@@ -4897,7 +5213,7 @@ async def create_inbound(request: Request, auth=Depends(require_replication_auth
     _raw_ib = (body.get("name") or "").strip()[:60]
     name = _raw_ib or f"inbound-{secrets.token_hex(3)}"
     protocol = str(body.get("protocol") or "vless").lower()
-    if protocol not in ("vless", "vmess", "trojan", "reality", "worker", "telegram", "node"):
+    if protocol not in ("vless", "vmess", "trojan", "reality", "worker", "telegram", "web_proxy", "node"):
         raise HTTPException(status_code=400, detail="Invalid protocol")
     if protocol == "node":
         selected = [str(x).strip() for x in (body.get("enabled_node_ids") or body.get("node_ids") or []) if str(x).strip()]
@@ -4932,6 +5248,14 @@ async def create_inbound(request: Request, auth=Depends(require_replication_auth
         domain = wdom
         external_domain = wdom
         sni = wdom
+    elif protocol == "web_proxy":
+        network = "ws"
+        security = "tls"
+        port = 443
+        external_port = 443
+        domain = _safe_host(SETTINGS.get("domain"), get_host())
+        external_domain = domain
+        sni = ""
 
     # Telegram uses the explicit internal listener from telegram_settings.
     if protocol == "telegram":
@@ -4948,6 +5272,18 @@ async def create_inbound(request: Request, auth=Depends(require_replication_auth
     ws_settings = body.get("ws_settings", {}) if isinstance(body.get("ws_settings"), dict) else {}
     grpc_settings = body.get("grpc_settings", {}) if isinstance(body.get("grpc_settings"), dict) else {}
     telegram_settings = body.get("telegram_settings", {}) if isinstance(body.get("telegram_settings"), dict) else {}
+    if protocol == "web_proxy":
+        # Web Proxy is carried by the panel's TLS/WSS endpoint; no standalone port.
+        port = 443
+        external_port = 443
+        external_domain = _safe_host(SETTINGS.get("domain"), get_host())
+        domain = external_domain
+        network = "ws"
+        security = "tls"
+        sni = ""
+        destination = ""
+        server_name = ""
+        telegram_settings = {}
     if protocol == "telegram":
         # Telegram Proxy does not use Xray Reality fields.
         sni = ""
@@ -5002,9 +5338,10 @@ async def create_inbound(request: Request, auth=Depends(require_replication_auth
             external_domain = domain or CONFIG.get("host", "")
         if network not in ("tcp", "xhttp", "grpc"):
             network = "tcp"
-    else:
-        # For TLS WS/XHTTP (non-reality, non-worker): external_domain and external_port should be empty
-        # The panel domain is used via SETTINGS["domain"] in generate_user_config
+    elif protocol != "web_proxy":
+        # For TLS WS/XHTTP (non-reality, non-worker): external_domain and external_port should be empty.
+        # Web Proxy is the exception: its public endpoint is the panel HTTPS/WSS host on 443.
+        # The panel domain is used via SETTINGS["domain"] in generate_user_config.
         external_domain = ""
         external_port = ""
 
@@ -5023,7 +5360,7 @@ async def create_inbound(request: Request, auth=Depends(require_replication_auth
         INBOUNDS[inbound_id] = {
             "name": name,
             "protocol": protocol,
-            "inbound_type": "transport",
+            "inbound_type": "telegram_web_proxy" if protocol == "web_proxy" else "transport",
             "port": port,
             "network": network,
             "security": security,
@@ -5074,13 +5411,17 @@ async def update_inbound(inbound_id: str, request: Request, _=Depends(require_au
         if not ib:
             raise HTTPException(status_code=404, detail="inbound not found")
         old_protocol = str(ib.get("protocol") or "").lower()
+        if str(ib.get("_managed_kind") or "") == "default_web_proxy":
+            requested_protocol = str(body.get("protocol") or "web_proxy").lower()
+            if requested_protocol != "web_proxy":
+                raise HTTPException(status_code=400, detail="اینباند پیش‌فرض web proxy نوع پروتکل ثابتی دارد")
         if "name" in body:
             _nn = str(body["name"]).strip()[:60]
             if _nn:
                 ib["name"] = _nn
         if "protocol" in body:
             p = str(body["protocol"]).lower()
-            if p in ("vless", "vmess", "trojan", "reality", "worker", "telegram", "node"): 
+            if p in ("vless", "vmess", "trojan", "reality", "worker", "telegram", "web_proxy", "node"): 
                 ib["protocol"] = p
         if ib.get("protocol") == "node":
             if inbound_id != "Node" and not ib.get("system"):
@@ -5097,6 +5438,19 @@ async def update_inbound(inbound_id: str, request: Request, _=Depends(require_au
             await save_state()
             asyncio.create_task(refresh_node_inbound_configs(inbound_id))
             return {"ok": True, "inbound_id": inbound_id, "enabled_node_ids": list(ib.get("enabled_node_ids") or [])}
+        if ib.get("protocol") == "web_proxy":
+            if str(ib.get("_managed_kind") or "") == "default_web_proxy":
+                ib["name"] = "web proxy"
+            ib.update({
+                "inbound_type": "telegram_web_proxy", "port": 443,
+                "network": "ws", "security": "tls", "external_port": 443,
+                "domain": _safe_host(SETTINGS.get("domain"), get_host()),
+                "external_domain": _safe_host(SETTINGS.get("domain"), get_host()),
+                "telegram_settings": {},
+            })
+            ib.pop("sni", None)
+            ib.pop("destination", None)
+            ib.pop("server_name", None)
         # A worker inbound always targets the connected worker domain; if the
         # inbound's domain is stale/empty, refresh it automatically.
         if ib.get("protocol") == "worker":
@@ -5334,10 +5688,10 @@ async def update_inbound_raw(inbound_id: str, request: Request, _=Depends(requir
             raise HTTPException(status_code=404, detail="inbound not found")
         old_protocol = str(existing.get("protocol") or "").lower()
         new_protocol = str(incoming.get("protocol") or old_protocol).lower()
-        if inbound_id == "Node" or old_protocol in ("node", "telegram"):
-            raise HTTPException(status_code=400, detail="Node and Telegram inbounds cannot be edited here")
-        if new_protocol in ("node", "telegram"):
-            raise HTTPException(status_code=400, detail="Node and Telegram inbounds cannot be edited here")
+        if inbound_id == "Node" or old_protocol in ("node", "telegram", "web_proxy"):
+            raise HTTPException(status_code=400, detail="Node, Telegram and Web Proxy inbounds cannot be edited here")
+        if new_protocol in ("node", "telegram", "web_proxy"):
+            raise HTTPException(status_code=400, detail="Node, Telegram and Web Proxy inbounds cannot be edited here")
         if new_protocol not in ("vless", "vmess", "trojan", "reality", "worker"):
             raise HTTPException(status_code=400, detail="Unsupported inbound protocol")
         if "port" in incoming:
@@ -5372,6 +5726,8 @@ async def delete_inbound(inbound_id: str, _=Depends(require_auth)):
             raise HTTPException(status_code=404, detail="inbound not found")
         if ib.get("proxy_managed"):
             raise HTTPException(status_code=400, detail="Proxy inbounds are managed from the Proxy tab")
+        if str(ib.get("_managed_kind") or "") == "default_web_proxy":
+            raise HTTPException(status_code=400, detail="اینباند پیش‌فرض web proxy قابل حذف نیست")
         ib = INBOUNDS.pop(inbound_id, None)
         # Protect system Inbound "Node" from deletion
         if inbound_id == "Node" or ib.get("system") is True:
@@ -5765,6 +6121,11 @@ async def create_user(request: Request, auth=Depends(require_replication_auth)):
                 if any((INBOUNDS.get(_iid, {}).get("protocol") or "").lower() == "telegram" for _iid in inbound_ids)
                 else ""
             ),
+            "web_proxy_secret": (
+                secrets.token_hex(16)
+                if any((INBOUNDS.get(_iid, {}).get("protocol") or "").lower() == "web_proxy" for _iid in inbound_ids)
+                else ""
+            ),
             "node_sync_password": secrets.token_urlsafe(18),
             "node_configs": {},
             "node_sync_state": {},
@@ -5846,6 +6207,12 @@ async def create_user(request: Request, auth=Depends(require_replication_auth)):
             # Rebuild its secret list and restart the listener now.
             for _tg_iid in [i for i in inbound_ids if (INBOUNDS.get(i, {}).get("protocol") or "").lower() == "telegram"]:
                 asyncio.create_task(_restart_telegram_proxy(_tg_iid))
+        if any((INBOUNDS.get(i, {}).get("protocol") or "").lower() == "web_proxy" for i in inbound_ids):
+            async with USERS_LOCK:
+                u = USERS.get(user_id)
+                if u and not re.fullmatch(r"[0-9a-f]{32}", str(u.get("web_proxy_secret") or "").lower()):
+                    u["web_proxy_secret"] = secrets.token_hex(16)
+            asyncio.create_task(save_state())
     # Reconcile the authoritative union of Node selections across all user inbounds.
     if _selected_node_ids_for_user(USERS[user_id]):
         asyncio.create_task(_sync_user_to_selected_nodes(user_id, dict(USERS[user_id])))
@@ -5891,6 +6258,8 @@ async def toggle_user(user_id: str, _=Depends(require_auth)):
         asyncio.create_task(_worker_sync_users())
     if _selected_node_ids_for_user(u):
         asyncio.create_task(_sync_user_to_selected_nodes(user_id, dict(u)))
+    if new_status != "active":
+        await TWP_SESSIONS.drop_user(user_id, "user_disabled")
     return {"ok": True, "user_id": user_id, "status": new_status}
 
 @app.patch("/api/users/{user_id}/reset")
@@ -6029,6 +6398,10 @@ async def edit_user(user_id: str, request: Request, _=Depends(require_auth)):
             cur_secret = str(u.get("telegram_secret") or "").strip().lower()
             if not re.fullmatch(r"[0-9a-f]{32}", cur_secret):
                 u["telegram_secret"] = derive_secret_from_uuid(u.get("config_uuid", user_id))
+        if any((INBOUNDS.get(i, {}).get("protocol") or "").lower() == "web_proxy" for i in (u.get("inbound_ids") or [])):
+            cur_web_secret = str(u.get("web_proxy_secret") or "").strip().lower()
+            if not re.fullmatch(r"[0-9a-f]{32}", cur_web_secret):
+                u["web_proxy_secret"] = secrets.token_hex(16)
 
         # Keep the relay link exactly in sync with the selected inbound list.
         _relay_iid = find_default_tls_ws_inbound_id()
@@ -6048,6 +6421,8 @@ async def edit_user(user_id: str, request: Request, _=Depends(require_auth)):
                 if _relay_iid and _relay_iid in _relay_ids:
                     _link["path"] = f"/ws/{u.get('config_uuid')}"
                     u["path"] = f"/ws/{u.get('config_uuid')}"
+    if not await _twp_authorized_user(user_id):
+        await TWP_SESSIONS.drop_user(user_id, "user_access_changed")
     if new_proxy_links or stale_proxy_config_uuids:
         async with LINKS_LOCK:
             for _cfg in stale_proxy_config_uuids:
@@ -6174,6 +6549,7 @@ async def delete_user(user_id: str, auth=Depends(require_replication_auth)):
             PATH_INDEX.pop(config_uuid, None)
         USERS.pop(target_uid, None)
     _USER_SPEED_LIMITERS.pop(target_uid, None)
+    await TWP_SESSIONS.drop_user(target_uid, "user_deleted")
     stale_paths = []
     async with LINKS_LOCK:
         for cfg_uuid in ([str(config_uuid)] if config_uuid else []) + proxy_config_uuids:
