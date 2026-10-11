@@ -49,7 +49,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import httpx
-import websockets
 
 # Import xhttp_siz10 router (must come after app is created)
 # xhttp_siz10 does `from main import ...`. When run as `python main.py` this
@@ -693,18 +692,6 @@ BOT_EXPIRY_TASK = None
 # ── Telegram Proxy Instances ────────────────────────────────────────────────
 # Maps inbound_id → MTProtoProxyServer instance
 TG_PROXY_INSTANCES: dict = {}
-WEB_PROXY_PROCESS: Optional[asyncio.subprocess.Process] = None
-WEB_PROXY_MANAGER_TASK: Optional[asyncio.Task] = None
-WEB_PROXY_HTTP_CLIENT: Optional[httpx.AsyncClient] = None
-WEB_PROXY_LAST_CONFIG = ""
-WEB_PROXY_READY = False
-WEB_PROXY_WARNED = set()
-try:
-    TELEMT_PORT = int(os.environ.get("TELEMT_WEB_PORT", "18080") or "18080")
-except (TypeError, ValueError):
-    TELEMT_PORT = 18080
-if not 1024 <= TELEMT_PORT <= 65535:
-    TELEMT_PORT = 18080
 
 # پروتکل‌های پشتیبانی‌شده برای هر کانفیگ
 PROTOCOLS = ("vless-ws", "xhttp-packet-up", "xhttp-stream-up", "xhttp-stream-one")
@@ -985,9 +972,6 @@ def generate_telegram_proxy_link(user_id: str, user: dict, inbound: dict, remark
     """
     # telegram_proxy merged into main.py
 
-    if is_default_web_proxy_inbound(inbound):
-        return generate_web_proxy_link(user_id, user, inbound)
-
     username = user.get("username", user_id)
     config_uuid = user.get("config_uuid", user_id)
     tg = inbound.get("telegram_settings") or {}
@@ -1021,30 +1005,6 @@ def generate_telegram_proxy_link(user_id: str, user: dict, inbound: dict, remark
     # The name is set by the user in the Telegram app after adding the proxy
     link = f"https://t.me/proxy?server={external_domain}&port={external_port}&secret={secret}"
     return link
-
-
-def generate_web_proxy_link(user_id: str, user: dict, inbound: dict) -> str:
-    """Create Telegram's path-scoped WEB proxy link for the managed inbound."""
-    if not WEB_PROXY_READY:
-        return ""
-    settings = inbound.get("web_proxy_settings") or {}
-    base_path = str(settings.get("base_path") or "").strip()
-    if not _valid_web_proxy_path(base_path):
-        return ""
-    domain = _panel_tls_ws_domain()
-    secret = str(user.get("telegram_secret") or "").strip().lower()
-    config_uuid = user.get("config_uuid", user_id)
-    if not SECRET_RE.fullmatch(secret):
-        secret = derive_secret_from_uuid(str(config_uuid))
-        user["telegram_secret"] = secret
-        if user_id in USERS:
-            USERS[user_id]["telegram_secret"] = secret
-    # Path-mode WEB links mark the normal MTProxy secret with 0x70 and encode
-    # the resulting bytes as unpadded base64url. Telegram's client removes the
-    # marker before applying its regular MTProxy transform.
-    marked_secret = base64.urlsafe_b64encode(b"\x70" + bytes.fromhex(secret)).decode("ascii").rstrip("=")
-    server = quote(f"{domain}/{base_path}", safe="")
-    return f"https://t.me/webproxy?server={server}&secret={marked_secret}"
 
 
 XRAY_URL = "https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-linux-64.zip"
@@ -1113,7 +1073,7 @@ async def startup():
                 "name": DEFAULT_TLS_WS_INBOUND_NAME,
                 "_managed_kind": "default_tls_ws",
                 "protocol": "vless", "inbound_type": "transport", "port": 443, "network": "ws", "security": "tls",
-                "domain": _panel_tls_ws_domain(),
+                "domain": _safe_host(SETTINGS.get("domain"), get_host()),
                 "external_domain": "", "sni": "", "external_port": "",
                 "fingerprint": "chrome", "reality_settings": {}, "xhttp_settings": {},
                 "ws_settings": {"path": "/ws/{uuid}"},
@@ -1130,7 +1090,7 @@ async def startup():
                 ib["inbound_type"] = "transport"
                 ib["network"] = "ws"
                 ib["security"] = "tls"
-                ib["domain"] = _panel_tls_ws_domain()
+                ib["domain"] = _safe_host(ib.get("domain"), SETTINGS.get("domain"), get_host())
                 ib["external_domain"] = ""
                 ib["external_port"] = ""
                 ib.setdefault("ws_settings", {"path": "/ws/{uuid}"})
@@ -1471,8 +1431,7 @@ async def startup():
     for _ib in INBOUNDS.values():
         _proto = (_ib.get("protocol") or "").lower()
         _sec = (_ib.get("security") or "").lower()
-        if (is_default_web_proxy_inbound(_ib) or _proto == "worker" or _proto == "reality"
-                or _sec == "reality" or _sec != "tls"):
+        if _proto == "worker" or _proto == "reality" or _sec == "reality" or _sec != "tls":
             continue
         if _ib.get("advanced_customized"):
             continue
@@ -1487,69 +1446,6 @@ async def startup():
     # points at the worker domain (address/host/sni auto-filled at boot too).
     if WORKER.get("connected"):
         await _ensure_worker_inbound()
-
-    # The managed Telegram WEB Proxy shares the panel hostname, but serves all
-    # bridge/carrier requests under one persisted, path-scoped namespace.
-    async with INBOUNDS_LOCK:
-        web_iid = find_default_web_proxy_inbound_id()
-        if not web_iid:
-            web_iid = "web-proxy" if "web-proxy" not in INBOUNDS else generate_short_id()
-            web_port = TELEMT_PORT
-            while web_port in _seen_ports and web_port < 65535:
-                web_port += 1
-            if web_port in _seen_ports:
-                raise RuntimeError("No free internal listener port remains for Web Proxy")
-            web_settings = {
-                "base_path": f"webproxy/{secrets.token_hex(8)}",
-                "system_secret": secrets.token_hex(16),
-                "carrier": "https",
-            }
-            web_domain = _panel_tls_ws_domain()
-            INBOUNDS[web_iid] = {
-                "name": DEFAULT_WEB_PROXY_INBOUND_NAME,
-                "_managed_kind": "default_web_proxy",
-                "protocol": "telegram",
-                "inbound_type": "transport",
-                "port": web_port,
-                "network": "web",
-                "security": "tls",
-                "domain": web_domain,
-                "external_domain": web_domain,
-                "external_port": 443,
-                "telegram_settings": {
-                    "internal_port": web_port,
-                    "external_port": 443,
-                    "external_domain": web_domain,
-                },
-                "web_proxy_settings": web_settings,
-                "created_at": datetime.now().isoformat(),
-            }
-            asyncio.create_task(save_state())
-            log_activity("inbound", f"اینباند {DEFAULT_WEB_PROXY_INBOUND_NAME} ساخته شد", "ok")
-        else:
-            ib = INBOUNDS[web_iid]
-            ib.setdefault("_managed_kind", "default_web_proxy")
-            ib["name"] = DEFAULT_WEB_PROXY_INBOUND_NAME
-            ib["protocol"] = "telegram"
-            ib["network"] = "web"
-            ib["security"] = "tls"
-            ib["port"] = int(ib.get("port") or TELEMT_PORT)
-            settings = ib.setdefault("web_proxy_settings", {})
-            if not _valid_web_proxy_path(settings.get("base_path")):
-                settings["base_path"] = f"webproxy/{secrets.token_hex(8)}"
-            if not SECRET_RE.fullmatch(str(settings.get("system_secret") or "")):
-                settings["system_secret"] = secrets.token_hex(16)
-            settings.setdefault("carrier", "https")
-            web_domain = _panel_tls_ws_domain()
-            ib["domain"] = web_domain
-            ib["external_domain"] = web_domain
-            ib["external_port"] = 443
-            ib["telegram_settings"] = {
-                "internal_port": int(ib.get("port") or TELEMT_PORT),
-                "external_port": 443,
-                "external_domain": web_domain,
-            }
-            asyncio.create_task(save_state())
 
     # User path migration: each user's path must match their WS inbound. A user
     # who has a WS (or worker) inbound must have path /ws/{config_uuid} so the
@@ -1619,16 +1515,6 @@ async def startup():
 
     # Start Telegram Proxy instances for all existing TG inbounds
     await _start_all_telegram_proxies()
-    await _sync_web_proxy_runtime()
-    global WEB_PROXY_MANAGER_TASK, WEB_PROXY_HTTP_CLIENT
-    if WEB_PROXY_HTTP_CLIENT is None:
-        WEB_PROXY_HTTP_CLIENT = httpx.AsyncClient(
-            timeout=httpx.Timeout(connect=8.0, read=70.0, write=70.0, pool=8.0),
-            follow_redirects=False,
-            limits=httpx.Limits(max_connections=256, max_keepalive_connections=64),
-        )
-    if WEB_PROXY_MANAGER_TASK is None or WEB_PROXY_MANAGER_TASK.done():
-        WEB_PROXY_MANAGER_TASK = asyncio.create_task(_web_proxy_manager_loop(), name="spider-web-proxy")
     global NODE_HEARTBEAT_TASK
     if NODE_HEARTBEAT_TASK is None or NODE_HEARTBEAT_TASK.done():
         NODE_HEARTBEAT_TASK = asyncio.create_task(_node_heartbeat_loop(), name="spider-node-heartbeat")
@@ -1654,9 +1540,6 @@ async def _start_telegram_proxy(inbound_id: str, inbound: dict):
     the Telegram inbound itself, while credentials remain per-user.
     """
     # telegram_proxy merged into main.py
-
-    if is_default_web_proxy_inbound(inbound):
-        return
 
     await _stop_telegram_proxy(inbound_id)
     tg = inbound.get("telegram_settings") or {}
@@ -1744,9 +1627,6 @@ async def _restart_telegram_proxy(inbound_id: str):
     """Restart the MTProto proxy for an inbound (e.g. after settings change)."""
     async with INBOUNDS_LOCK:
         ib = INBOUNDS.get(inbound_id)
-    if ib and is_default_web_proxy_inbound(ib):
-        await _sync_web_proxy_runtime()
-        return
     if ib and (ib.get("protocol") or "").lower() == "telegram":
         await _start_telegram_proxy(inbound_id, ib)
 
@@ -1851,7 +1731,6 @@ async def shutdown():
     # Stop all Telegram Proxy instances
     for iid in list(TG_PROXY_INSTANCES.keys()):
         await _stop_telegram_proxy(iid)
-    await _stop_web_proxy_runtime()
     await save_state()
     if http_client:
         await http_client.aclose()
@@ -2301,13 +2180,7 @@ def _safe_host(*candidates: str) -> str:
     return get_host()
 
 
-def _panel_tls_ws_domain() -> str:
-    """Use the same authoritative panel hostname for TLS+WS and Web Proxy."""
-    return _safe_host(SETTINGS.get("domain"), get_host())
-
-
 DEFAULT_TLS_WS_INBOUND_NAME = "پیش‌فرض TLS + WS"
-DEFAULT_WEB_PROXY_INBOUND_NAME = "Web Proxy"
 LEGACY_HTTP_WS_INBOUND_NAME = "پیش‌فرض HTTP + WS"
 LEGACY_TLS_WS_NAMES = {"VLESS+WS پیش‌فرض", "VLESS + WS پیش‌فرض", "پیش‌فرض VLESS+WS", "پیش‌فرض VLESS + WS"}
 
@@ -2353,467 +2226,6 @@ def find_default_tls_ws_inbound_id() -> str | None:
             ib.setdefault("_managed_kind", "default_tls_ws")
             return iid
     return None
-
-
-def is_default_web_proxy_inbound(inbound: dict | None) -> bool:
-    if not inbound:
-        return False
-    return (str(inbound.get("_managed_kind") or "") == "default_web_proxy"
-            or (str(inbound.get("name") or "").strip() == DEFAULT_WEB_PROXY_INBOUND_NAME
-                and str(inbound.get("protocol") or "").lower() == "telegram"))
-
-
-def find_default_web_proxy_inbound_id() -> str | None:
-    for iid, ib in INBOUNDS.items():
-        if str(ib.get("_managed_kind") or "") == "default_web_proxy":
-            return iid
-    for iid, ib in INBOUNDS.items():
-        if is_default_web_proxy_inbound(ib):
-            ib.setdefault("_managed_kind", "default_web_proxy")
-            return iid
-    return None
-
-
-def _valid_web_proxy_path(value: object) -> bool:
-    path = str(value or "")
-    if not path or len(path) > 128 or path.startswith("/") or path.endswith("/"):
-        return False
-    return all(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", segment or "") for segment in path.split("/"))
-
-
-def _telemt_bin_path() -> Path | None:
-    configured = str(os.environ.get("TELEMT_BIN") or "").strip()
-    candidates = [Path(configured).expanduser()] if configured else []
-    candidates.extend([
-        Path("/usr/local/bin/telemt"),
-        Path("/usr/bin/telemt"),
-        Path(os.path.dirname(os.path.abspath(__file__))) / "telemt",
-    ])
-    for candidate in candidates:
-        if candidate.is_file() and os.access(candidate, os.X_OK):
-            return candidate
-    return None
-
-
-def _web_proxy_public_addr(host: str) -> str:
-    """Resolve the panel hostname to the public address Telemt needs for WEB mode.
-
-    A deployment with a stable public address should set WEB_PROXY_PUBLIC_ADDR;
-    DNS discovery is a convenience for ordinary single-address VPS domains.
-    """
-    override = str(os.environ.get("WEB_PROXY_PUBLIC_ADDR") or "").strip()
-    if override:
-        raw_host, sep, raw_port = override.rpartition(":")
-        if not sep:
-            raw_host, raw_port = override, "443"
-        try:
-            address = ipaddress.ip_address(raw_host.strip("[]"))
-            port = int(raw_port)
-            if address.version == 4 and address.is_global and port == 443:
-                return f"{address}:443"
-        except (ValueError, TypeError):
-            return ""
-        return ""
-    host = str(host or "").strip().strip("[]")
-    if not host:
-        return ""
-    try:
-        direct = ipaddress.ip_address(host)
-        return f"{direct}:443" if direct.version == 4 and direct.is_global else ""
-    except ValueError:
-        pass
-    try:
-        answers = socket.getaddrinfo(host, 443, socket.AF_INET, socket.SOCK_STREAM)
-        for answer in answers:
-            address = ipaddress.ip_address(answer[4][0])
-            if address.version == 4 and address.is_global:
-                return f"{address}:443"
-    except Exception:
-        pass
-    return ""
-
-
-def _toml_string(value: object) -> str:
-    # JSON quoted strings use the same escapes as TOML basic strings.
-    return json.dumps(str(value), ensure_ascii=False)
-
-
-async def _web_proxy_config_snapshot() -> tuple[dict | None, list[tuple[str, str]], str, str]:
-    async with INBOUNDS_LOCK:
-        iid = find_default_web_proxy_inbound_id()
-        inbound = dict(INBOUNDS.get(iid) or {}) if iid else None
-    if not iid or not inbound:
-        return None, [], "", ""
-    settings = dict(inbound.get("web_proxy_settings") or {})
-    base_path = str(settings.get("base_path") or "").strip()
-    host = _panel_tls_ws_domain()
-    public_addr = _web_proxy_public_addr(host)
-    port = int((inbound.get("telegram_settings") or {}).get("internal_port") or inbound.get("port") or TELEMT_PORT)
-    async with USERS_LOCK:
-        users = [(str(uid), dict(user)) for uid, user in USERS.items()]
-    profiles = []
-    for uid, user in users:
-        selected = user.get("inbound_ids") or ([user.get("inbound_id")] if user.get("inbound_id") else [])
-        if str(iid) not in {str(item) for item in selected}:
-            continue
-        if str(user.get("status") or "active").lower() != "active":
-            continue
-        secret = str(user.get("telegram_secret") or "").strip().lower()
-        if not SECRET_RE.fullmatch(secret):
-            secret = derive_secret_from_uuid(str(user.get("config_uuid") or uid))
-        profile_name = "u_" + hashlib.sha256(uid.encode("utf-8")).hexdigest()[:24]
-        profiles.append((profile_name, secret))
-    system_secret = str(settings.get("system_secret") or "").strip().lower()
-    if SECRET_RE.fullmatch(system_secret):
-        profiles.append(("spider_internal", system_secret))
-    return inbound, profiles, host, public_addr
-
-
-def _render_telemt_config(inbound: dict, profiles: list[tuple[str, str]], host: str, public_addr: str) -> str:
-    settings = inbound.get("web_proxy_settings") or {}
-    base_path = str(settings.get("base_path") or "").strip()
-    port = int((inbound.get("telegram_settings") or {}).get("internal_port") or inbound.get("port") or TELEMT_PORT)
-    lines = [
-        "[general]",
-        "use_middle_proxy = true",
-        'log_level = "normal"',
-        "",
-        "[general.modes]",
-        "classic = false",
-        "secure = false",
-        "tls = true",
-        "",
-        "[general.links]",
-        "show = []",
-        "",
-        "[access.users]",
-    ]
-    for profile_name, secret in profiles:
-        lines.append(f"{_toml_string(profile_name)} = {_toml_string(secret)}")
-    lines.extend([
-        "",
-        "[[server.listeners]]",
-        'ip = "127.0.0.1"',
-        f"port = {port}",
-        'transport = "web"',
-        "proxy_protocol = false",
-        'web_client_ip_source = "x_forwarded_for"',
-        'web_trusted_proxy_cidrs = ["127.0.0.1/32"]',
-        "",
-        "[web]",
-        "enabled = true",
-        'carrier = "https"',
-        'decoy_fasttrack_mode = "off"',
-        'http_connection_capacity_action = "respond"',
-        "",
-        "[[web.vhosts]]",
-        f"host = {_toml_string(host)}",
-        f"base_path = {_toml_string(base_path)}",
-        f"public_addr = {_toml_string(public_addr)}",
-        "",
-        "[web.vhosts.decoy]",
-        'mode = "static_directory"',
-        f"directory = {_toml_string(str(Path(os.path.dirname(os.path.abspath(__file__))) / 'static'))}",
-        'index = "index.html"',
-    ])
-    for profile_name, _secret in profiles:
-        lines.extend([
-            "",
-            "[[web.vhosts.profiles]]",
-            f"user = {_toml_string(profile_name)}",
-            'secret_mode = "plain"',
-            "max_sessions = 8",
-            "max_streams = 512",
-            "max_streams_per_session = 64",
-        ])
-    return "\n".join(lines) + "\n"
-
-
-async def _watch_web_proxy_output(proc: asyncio.subprocess.Process):
-    if proc.stdout is None:
-        return
-    while True:
-        line = await proc.stdout.readline()
-        if not line:
-            break
-        message = line.decode("utf-8", "replace").strip()
-        if not message:
-            continue
-        message = re.sub(r"(?i)(secret|bridge|token)=([^&\\s]+)", r"\1=[redacted]", message)
-        logger.info("[Telemt] %s", message[:600])
-
-
-WEB_PROXY_SYNC_LOCK = asyncio.Lock()
-WEB_PROXY_LOG_TASK: Optional[asyncio.Task] = None
-
-
-async def _sync_web_proxy_runtime() -> bool:
-    global WEB_PROXY_PROCESS, WEB_PROXY_LAST_CONFIG, WEB_PROXY_READY, WEB_PROXY_LOG_TASK
-    async with WEB_PROXY_SYNC_LOCK:
-        inbound, profiles, host, public_addr = await _web_proxy_config_snapshot()
-        if not inbound:
-            WEB_PROXY_READY = False
-            return False
-        binary = _telemt_bin_path()
-        if not binary:
-            WEB_PROXY_READY = False
-            if "missing-binary" not in WEB_PROXY_WARNED:
-                logger.warning("Web Proxy is configured but Telemt is unavailable; install the bundled runtime or set TELEMT_BIN")
-                WEB_PROXY_WARNED.add("missing-binary")
-            return False
-        if not host or not public_addr:
-            WEB_PROXY_READY = False
-            if "public-address" not in WEB_PROXY_WARNED:
-                logger.warning("Web Proxy is waiting for a public IPv4 address; set WEB_PROXY_PUBLIC_ADDR for a stable address")
-                WEB_PROXY_WARNED.add("public-address")
-            return False
-        settings = inbound.get("web_proxy_settings") or {}
-        port = int((inbound.get("telegram_settings") or {}).get("internal_port") or inbound.get("port") or TELEMT_PORT)
-        if not _valid_web_proxy_path(settings.get("base_path")):
-            WEB_PROXY_READY = False
-            return False
-        config_text = _render_telemt_config(inbound, profiles, host, public_addr)
-        config_dir = DATA_DIR / "telemt"
-        config_path = config_dir / "config.toml"
-        config_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-        try:
-            os.chmod(config_dir, 0o700)
-            if config_text != WEB_PROXY_LAST_CONFIG or not config_path.is_file():
-                temp_path = config_dir / f".config.{secrets.token_hex(6)}.tmp"
-                temp_path.write_text(config_text, encoding="utf-8")
-                os.chmod(temp_path, 0o600)
-                os.replace(temp_path, config_path)
-                WEB_PROXY_LAST_CONFIG = config_text
-        except Exception as exc:
-            WEB_PROXY_READY = False
-            logger.warning("Could not persist Telemt configuration: %s", exc)
-            return False
-        if WEB_PROXY_PROCESS is None or WEB_PROXY_PROCESS.returncode is not None:
-            try:
-                env = dict(os.environ)
-                env.setdefault("RUST_LOG", "info")
-                WEB_PROXY_PROCESS = await asyncio.create_subprocess_exec(
-                    str(binary), str(config_path),
-                    cwd=str(config_dir), env=env,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.STDOUT,
-                )
-                WEB_PROXY_LOG_TASK = asyncio.create_task(_watch_web_proxy_output(WEB_PROXY_PROCESS), name="spider-telemt-logs")
-                ready_until = asyncio.get_running_loop().time() + 5
-                while asyncio.get_running_loop().time() < ready_until:
-                    if WEB_PROXY_PROCESS.returncode is not None:
-                        break
-                    try:
-                        _reader, _writer = await asyncio.wait_for(
-                            asyncio.open_connection("127.0.0.1", port), timeout=0.25
-                        )
-                        _writer.close()
-                        await _writer.wait_closed()
-                        break
-                    except (OSError, asyncio.TimeoutError):
-                        await asyncio.sleep(0.1)
-            except Exception as exc:
-                WEB_PROXY_PROCESS = None
-                WEB_PROXY_READY = False
-                logger.warning("Could not start Telemt Web Proxy runtime: %s", exc)
-                return False
-        WEB_PROXY_READY = bool(WEB_PROXY_PROCESS and WEB_PROXY_PROCESS.returncode is None)
-        if WEB_PROXY_READY:
-            try:
-                _reader, _writer = await asyncio.wait_for(
-                    asyncio.open_connection("127.0.0.1", port), timeout=0.5
-                )
-                _writer.close()
-                await _writer.wait_closed()
-            except (OSError, asyncio.TimeoutError):
-                WEB_PROXY_READY = False
-        return WEB_PROXY_READY
-
-
-async def _web_proxy_manager_loop():
-    while True:
-        try:
-            await _sync_web_proxy_runtime()
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception("Web Proxy reconciliation failed")
-        await asyncio.sleep(5)
-
-
-async def _stop_web_proxy_runtime():
-    global WEB_PROXY_PROCESS, WEB_PROXY_READY, WEB_PROXY_MANAGER_TASK, WEB_PROXY_HTTP_CLIENT, WEB_PROXY_LOG_TASK
-    if WEB_PROXY_MANAGER_TASK and not WEB_PROXY_MANAGER_TASK.done():
-        WEB_PROXY_MANAGER_TASK.cancel()
-        try:
-            await WEB_PROXY_MANAGER_TASK
-        except asyncio.CancelledError:
-            pass
-    WEB_PROXY_MANAGER_TASK = None
-    proc = WEB_PROXY_PROCESS
-    WEB_PROXY_PROCESS = None
-    WEB_PROXY_READY = False
-    if proc and proc.returncode is None:
-        proc.terminate()
-        try:
-            await asyncio.wait_for(proc.wait(), timeout=5)
-        except asyncio.TimeoutError:
-            proc.kill()
-            await proc.wait()
-    if WEB_PROXY_LOG_TASK and not WEB_PROXY_LOG_TASK.done():
-        try:
-            await asyncio.wait_for(WEB_PROXY_LOG_TASK, timeout=1)
-        except asyncio.TimeoutError:
-            WEB_PROXY_LOG_TASK.cancel()
-            await asyncio.gather(WEB_PROXY_LOG_TASK, return_exceptions=True)
-    WEB_PROXY_LOG_TASK = None
-    if WEB_PROXY_HTTP_CLIENT:
-        await WEB_PROXY_HTTP_CLIENT.aclose()
-        WEB_PROXY_HTTP_CLIENT = None
-
-
-class WebProxyForwardingMiddleware:
-    """Pass the managed, exact path subtree and its WebSocket carrier to Telemt."""
-    def __init__(self, app):
-        self.app = app
-
-    async def __call__(self, scope, receive, send):
-        if scope.get("type") not in ("http", "websocket"):
-            return await self.app(scope, receive, send)
-        iid = find_default_web_proxy_inbound_id()
-        inbound = INBOUNDS.get(iid) if iid else None
-        settings = (inbound or {}).get("web_proxy_settings") or {}
-        base_path = str(settings.get("base_path") or "").strip()
-        if not _valid_web_proxy_path(base_path):
-            return await self.app(scope, receive, send)
-        prefix = ("/" + base_path + "/").encode("ascii")
-        raw_path = scope.get("raw_path") or str(scope.get("path") or "").encode("utf-8")
-        if not raw_path.startswith(prefix):
-            return await self.app(scope, receive, send)
-        if not WEB_PROXY_READY:
-            if scope["type"] == "http":
-                body = b"Web Proxy runtime is not ready"
-                await send({"type": "http.response.start", "status": 503,
-                            "headers": [(b"content-type", b"text/plain; charset=utf-8"), (b"content-length", str(len(body)).encode())]})
-                await send({"type": "http.response.body", "body": body})
-            else:
-                await send({"type": "websocket.close", "code": 1013})
-            return
-        port = int((inbound.get("telegram_settings") or {}).get("internal_port") or inbound.get("port") or TELEMT_PORT)
-        if scope["type"] == "http":
-            await self._http(scope, receive, send, raw_path, port)
-        else:
-            await self._websocket(scope, receive, send, raw_path, port)
-
-    @staticmethod
-    def _headers(scope):
-        return {key.decode("latin-1").lower(): value.decode("latin-1")
-                for key, value in scope.get("headers", [])}
-
-    @staticmethod
-    def _client_ip(scope, headers):
-        # Use the ASGI peer address; the Web listener is local to this app and
-        # accepts exactly one forwarded address from this trusted proxy.
-        candidate = str((scope.get("client") or ("127.0.0.1", 0))[0])
-        try:
-            return str(ipaddress.ip_address(candidate))
-        except ValueError:
-            return "127.0.0.1"
-
-    @staticmethod
-    def _target_path(scope, raw_path):
-        query = scope.get("query_string") or b""
-        return raw_path.decode("latin-1") + (("?" + query.decode("latin-1")) if query else "")
-
-    async def _http(self, scope, receive, send, raw_path, port):
-        if WEB_PROXY_HTTP_CLIENT is None:
-            body = b"Web Proxy runtime is not ready"
-            await send({"type": "http.response.start", "status": 503,
-                        "headers": [(b"content-type", b"text/plain"), (b"content-length", str(len(body)).encode())]})
-            await send({"type": "http.response.body", "body": body})
-            return
-        headers_in = self._headers(scope)
-        excluded = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te",
-                    "trailers", "transfer-encoding", "upgrade", "host", "content-length",
-                    "x-forwarded-for", "x-forwarded-proto", "x-forwarded-host"}
-        headers = [(k, v) for k, v in headers_in.items() if k not in excluded]
-        headers.extend([
-            ("host", headers_in.get("host", "")),
-            ("x-forwarded-for", self._client_ip(scope, headers_in)),
-            ("x-forwarded-proto", "https"),
-        ])
-        body = await Request(scope, receive).body()
-        target = "http://127.0.0.1:" + str(port) + self._target_path(scope, raw_path)
-        try:
-            response = await WEB_PROXY_HTTP_CLIENT.request(scope.get("method", "GET"), target,
-                                                           headers=headers, content=body)
-            hop = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te",
-                   "trailers", "transfer-encoding", "upgrade", "content-length", "content-encoding"}
-            response_headers = [(k.lower().encode("latin-1"), v.encode("latin-1"))
-                                for k, v in response.headers.multi_items() if k.lower() not in hop]
-            response_headers.append((b"content-length", str(len(response.content)).encode()))
-            await send({"type": "http.response.start", "status": response.status_code, "headers": response_headers})
-            await send({"type": "http.response.body", "body": response.content})
-        except Exception:
-            body = b"Web Proxy upstream unavailable"
-            await send({"type": "http.response.start", "status": 502,
-                        "headers": [(b"content-type", b"text/plain; charset=utf-8"), (b"content-length", str(len(body)).encode())]})
-            await send({"type": "http.response.body", "body": body})
-
-    async def _websocket(self, scope, receive, send, raw_path, port):
-        ws = WebSocket(scope, receive, send)
-        headers = self._headers(scope)
-        host = headers.get("host", "")
-        if not host:
-            await send({"type": "websocket.close", "code": 1008})
-            return
-        query = scope.get("query_string") or b""
-        uri = "ws://" + host + raw_path.decode("latin-1") + (("?" + query.decode("latin-1")) if query else "")
-        forwarded = [("X-Forwarded-For", self._client_ip(scope, headers)), ("X-Forwarded-Proto", "https")]
-        origin = headers.get("origin")
-        try:
-            async with websockets.connect(
-                uri, host="127.0.0.1", port=port, origin=origin,
-                subprotocols=scope.get("subprotocols") or None,
-                extra_headers=forwarded, ping_interval=None, max_size=None,
-                open_timeout=10, close_timeout=5,
-            ) as upstream:
-                await ws.accept(subprotocol=upstream.subprotocol)
-
-                async def client_to_server():
-                    while True:
-                        message = await ws.receive()
-                        kind = message.get("type")
-                        if kind == "websocket.disconnect":
-                            return
-                        data = message.get("bytes")
-                        if data is None:
-                            data = message.get("text", "")
-                        await upstream.send(data)
-
-                async def server_to_client():
-                    async for message in upstream:
-                        if isinstance(message, bytes):
-                            await ws.send_bytes(message)
-                        else:
-                            await ws.send_text(message)
-
-                tasks = [asyncio.create_task(client_to_server()), asyncio.create_task(server_to_client())]
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-                for task in pending:
-                    task.cancel()
-                await asyncio.gather(*pending, return_exceptions=True)
-                for task in done:
-                    task.exception() if not task.cancelled() else None
-                await ws.close()
-        except Exception:
-            try:
-                await ws.close(code=1011)
-            except Exception:
-                pass
-
-
-app.add_middleware(WebProxyForwardingMiddleware)
 
 
 def _url_authority_host(host: str) -> str:
@@ -3255,7 +2667,7 @@ def generate_user_config(user_id: str, user: dict, inbound_id: str = None, addr:
 
     # Never generate a client-facing config until a real public hostname is known.
     # Returning an empty config lets the caller/UI retry while the resolver works.
-    panel_domain = _panel_tls_ws_domain()
+    panel_domain = _safe_host(SETTINGS.get("domain"), get_host())
     if not panel_domain and proto not in ("worker", "reality", "telegram", "reverse"):
         return ""
 
@@ -3350,7 +2762,7 @@ def generate_user_config(user_id: str, user: dict, inbound_id: str = None, addr:
 
     # ── TLS (WS default / XHTTP selectable) — served by the FastAPI relay ──
     # address/host/sni always = the panel main domain; port 443 (Railway TLS).
-    panel_domain = _panel_tls_ws_domain()
+    panel_domain = _safe_host(SETTINGS.get("domain"), get_host())
 
     # ── REVERSE (user → Worker → Railway → site) — its own inbound, path
     # /reverse/{uuid}, addressed to the WORKER domain so the client dials CF first.
@@ -3394,14 +2806,14 @@ def generate_user_config(user_id: str, user: dict, inbound_id: str = None, addr:
     if str((inbound or {}).get("proxy_id") or "").strip():
         # Proxy inbounds always use the panel's current hostname. The saved
         # inbound metadata can predate a domain change.
-        panel_domain = _panel_tls_ws_domain()
+        panel_domain = _safe_host(SETTINGS.get("domain"), get_host())
         host = addr_ip or _default_ws_address(inbound, panel_domain)
         port = addr_port or "443"
         transport = "ws"
         security = "tls"
         tls_host = panel_domain
     elif is_default_tls_ws_inbound(inbound):
-        panel_domain = _panel_tls_ws_domain()
+        panel_domain = _safe_host(SETTINGS.get("domain"), get_host())
         host = addr_ip or _default_ws_address(inbound, panel_domain)
         port = addr_port or "443"
         transport = "ws"
@@ -3547,7 +2959,7 @@ def generate_status_config(user: dict, configs: list) -> str:
     config_uuid = user.get("config_uuid", "") or user_id
 
     # Use panel domain from discovery (required for TLS WS/XHTTP).
-    panel_domain = _panel_tls_ws_domain()
+    panel_domain = _safe_host(SETTINGS.get("domain"), get_host())
     if not panel_domain:
         return ""
 
@@ -3928,7 +3340,6 @@ class MTProtoProxyServer:
             if iid != self.inbound_id and _is_real_listener_inbound(ib)
         )
         used.add(int(CONFIG.get("port") or 8080))
-        used.add(int(TELEMT_PORT))
         while port in used or not 1024 <= port <= 65535:
             port += 1
             if port > 65535:
@@ -5436,7 +4847,7 @@ async def list_inbounds(auth=Depends(require_replication_auth)):
             "inbound_type": "transport",
             "network": ib.get("network", "ws"),
             "security": ib.get("security", "tls"),
-            "domain": _panel_tls_ws_domain(),
+            "domain": ib.get("domain") or _safe_host(SETTINGS.get("domain"), get_host()),
             "external_port": ib.get("external_port") or 443,
             "port": ib.get("port") or 443,
             "ws_settings": ib.get("ws_settings") or {"path": "/ws/{uuid}"},
@@ -5445,13 +4856,8 @@ async def list_inbounds(auth=Depends(require_replication_auth)):
     result = []
     for iid, ib in snap.items():
         item = dict(ib)
-        if is_default_web_proxy_inbound(item):
-            web_settings = dict(item.get("web_proxy_settings") or {})
-            web_settings.pop("system_secret", None)
-            item["web_proxy_settings"] = web_settings
-            item["web_proxy_runtime_ready"] = WEB_PROXY_READY
         if str(item.get("proxy_id") or "").strip():
-            panel_domain = _panel_tls_ws_domain()
+            panel_domain = _safe_host(SETTINGS.get("domain"), get_host())
             item["domain"] = panel_domain
             item["external_domain"] = panel_domain
         result.append({
@@ -5479,7 +4885,7 @@ async def create_inbound(request: Request, auth=Depends(require_replication_auth
                     "name": DEFAULT_TLS_WS_INBOUND_NAME,
                     "protocol": "vless", "inbound_type": "transport",
                     "port": 443, "network": "ws", "security": "tls",
-                    "domain": _panel_tls_ws_domain(),
+                    "domain": _safe_host(SETTINGS.get("domain"), get_host()),
                     "external_domain": "", "sni": "", "external_port": "",
                     "fingerprint": "chrome", "ws_settings": {"path": "/ws/{uuid}"},
                     "reality_settings": {}, "xhttp_settings": {},
@@ -5667,8 +5073,6 @@ async def update_inbound(inbound_id: str, request: Request, _=Depends(require_au
         ib = INBOUNDS.get(inbound_id)
         if not ib:
             raise HTTPException(status_code=404, detail="inbound not found")
-        if is_default_web_proxy_inbound(ib):
-            raise HTTPException(status_code=400, detail="Web Proxy inbound is managed by SpiderPanel")
         old_protocol = str(ib.get("protocol") or "").lower()
         if "name" in body:
             _nn = str(body["name"]).strip()[:60]
@@ -5966,8 +5370,6 @@ async def delete_inbound(inbound_id: str, _=Depends(require_auth)):
         ib = INBOUNDS.get(inbound_id)
         if not ib:
             raise HTTPException(status_code=404, detail="inbound not found")
-        if is_default_web_proxy_inbound(ib):
-            raise HTTPException(status_code=400, detail="Web Proxy inbound is managed by SpiderPanel")
         if ib.get("proxy_managed"):
             raise HTTPException(status_code=400, detail="Proxy inbounds are managed from the Proxy tab")
         ib = INBOUNDS.pop(inbound_id, None)
@@ -6069,7 +5471,7 @@ async def _upsert_remote_user(body: dict) -> dict:
                     "name": DEFAULT_TLS_WS_INBOUND_NAME,
                     "protocol": "vless", "inbound_type": "transport",
                     "port": 443, "network": "ws", "security": "tls",
-                    "domain": _panel_tls_ws_domain(),
+                    "domain": _safe_host(SETTINGS.get("domain"), get_host()),
                     "external_domain": "", "sni": "", "external_port": "",
                     "fingerprint": "chrome", "ws_settings": {"path": "/ws/{uuid}"},
                     "reality_settings": {}, "xhttp_settings": {},
@@ -6448,8 +5850,6 @@ async def create_user(request: Request, auth=Depends(require_replication_auth)):
     if _selected_node_ids_for_user(USERS[user_id]):
         asyncio.create_task(_sync_user_to_selected_nodes(user_id, dict(USERS[user_id])))
     host = SETTINGS.get("domain") or get_host()
-    if any(is_default_web_proxy_inbound(INBOUNDS.get(iid)) for iid in inbound_ids):
-        await _sync_web_proxy_runtime()
     asyncio.create_task(_xray_apply())  # refresh Xray clients after user change
     return {
         "user_id": user_id,
@@ -6489,8 +5889,6 @@ async def toggle_user(user_id: str, _=Depends(require_auth)):
     # Reflect enable/disable on the worker side too.
     if WORKER.get("connected") and _user_uses_worker_inbound(u):
         asyncio.create_task(_worker_sync_users())
-    if any(is_default_web_proxy_inbound(INBOUNDS.get(iid)) for iid in (u.get("inbound_ids") or [])):
-        asyncio.create_task(_sync_web_proxy_runtime())
     if _selected_node_ids_for_user(u):
         asyncio.create_task(_sync_user_to_selected_nodes(user_id, dict(u)))
     return {"ok": True, "user_id": user_id, "status": new_status}
@@ -16581,4 +15979,4 @@ async def bot_channel_run(_=Depends(require_auth)):
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=CONFIG["port"], log_level="info", workers=1, access_log=False)
+    uvicorn.run("main:app", host="0.0.0.0", port=CONFIG["port"], log_level="info", workers=1)

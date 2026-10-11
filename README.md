@@ -107,14 +107,6 @@ The project installer is intended to handle dependency setup, application files 
 - Public-domain discovery is important for subscription URLs and user-facing links.
 - Avoid hard-coding `localhost` as a public subscription hostname.
 
-### Telegram Web Proxy inbound
-
-SpiderPanel provisions a managed **Web Proxy** inbound with its own persistent path below the panel hostname. It uses Telemt's path-scoped WEB transport and creates a per-user Telegram Desktop WEB link when that inbound is selected. The deployment must keep HTTPS on the panel domain and forward the full path, original `Host`, and one `X-Forwarded-For` address to the app. The installer downloads Telemt 3.5.14 from its official release and verifies the published SHA-256 checksum; Docker builds the same pinned source release and includes its license.
-
-Telemt requires a stable public IPv4 endpoint on port 443. Set `WEB_PROXY_PUBLIC_ADDR` to that address (or `IPv4:443`) when DNS auto-discovery does not resolve to the exact public endpoint used by the panel. Telegram's `t.me/webproxy` path links are supported by compatible Telegram Desktop builds; client support varies. The managed listener binds only to `127.0.0.1`, and Uvicorn access logging is disabled so bridge and session credentials in request URLs are not written to access logs.
-
-See the [Telemt WEB Proxy documentation](https://github.com/telemt/telemt/blob/main/docs/WEB/WEB_PROXY.en.md) for the protocol, path and TLS termination requirements.
-
 ---
 
 # 🧭 Public endpoint & subscription flow
@@ -319,7 +311,7 @@ For local experimentation, install the Python dependencies and run the FastAPI a
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python -m uvicorn main:app --host 0.0.0.0 --port 8080 --no-access-log
+python -m uvicorn main:app --host 0.0.0.0 --port 8080
 ```
 
 Then open:
@@ -524,7 +516,7 @@ FastAPI
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python -m uvicorn main:app --host 0.0.0.0 --port 8080 --no-access-log
+python -m uvicorn main:app --host 0.0.0.0 --port 8080
 ```
 
 سپس:
