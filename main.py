@@ -6487,8 +6487,15 @@ async def create_user(request: Request, auth=Depends(require_replication_auth)):
         # Determine the path based on the inbound type, not just transport_type
         # WS/Worker inbound -> /ws/{config_uuid}; XHTTP/Reality use their own path.
         primary_inbound = INBOUNDS.get(inbound_id) if inbound_id else None
-        primary_inbound_proto = (primary_inbound.get("protocol") if primary_inbound else "").lower()
-        primary_inbound_network = (primary_inbound.get("network") if primary_inbound else "").lower()
+        # The system "Node" selector is a management-only pick (which remote
+        # Nodes replicate this user to), not a real listener — it carries no
+        # "protocol"/"network" values in the usual sense, and "network" is
+        # entirely absent from its record. .get(...) then returns None, so it
+        # must be coerced with `or ""` before .lower(); calling .lower() on
+        # None directly (as before) raised an AttributeError and crashed the
+        # request with a non-JSON HTTP 500 whenever Node was selected.
+        primary_inbound_proto = str((primary_inbound or {}).get("protocol") or "").lower()
+        primary_inbound_network = str((primary_inbound or {}).get("network") or "").lower()
         worker_selected = any(((INBOUNDS.get(iid) or {}).get("protocol") or "").lower() == "worker" for iid in inbound_ids)
         relay_default_id = find_default_tls_ws_inbound_id()
         relay_inbound_ids = [iid for iid in inbound_ids if _is_panel_relay_inbound(iid, INBOUNDS.get(iid))]
