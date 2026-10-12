@@ -436,8 +436,9 @@ input,select,button,textarea{font-family:inherit}
   width:260px;background:#0a0a0d;
   border-left:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;
   position:fixed;top:0;bottom:0;right:0;z-index:100;transition:transform .35s cubic-bezier(.4,0,.2,1);
-  overflow-y:auto;overflow-x:hidden;box-shadow:0 8px 32px rgba(0,0,0,.6);
-  height:100vh;
+  /* Keep the brand/footer fixed; the navigation below is the single scroll area. */
+  overflow:hidden;overflow-x:hidden;box-shadow:0 8px 32px rgba(0,0,0,.6);
+  height:100vh;height:100dvh;
 }
 .sb-brand{padding:22px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border)}
 .sb-brand img{width:56px;height:56px;background:#000;border-radius:14px;padding:4px}
@@ -445,7 +446,7 @@ input,select,button,textarea{font-family:inherit}
 .sb-brand-t{font-size:17px;font-weight:800;letter-spacing:3px;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .sb-brand-t span{color:inherit;-webkit-text-fill-color:inherit}
 .sb-brand-s{font-size:10px;color:var(--txt2);letter-spacing:5px;margin-top:2px}
-.sb-nav{flex:1;padding:10px;overflow-y:auto;display:flex;flex-direction:column;justify-content:flex-start;gap:2px;min-height:0}
+.sb-nav{flex:1 1 auto;padding:10px;overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin;display:flex;flex-direction:column;justify-content:flex-start;gap:2px;min-height:0;min-width:0}.sb-brand,.sb-foot{flex-shrink:0}
 .nav-item{
   padding:11px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;
   font-size:13px;font-weight:500;color:var(--txt2);transition:all .2s;
@@ -1064,9 +1065,14 @@ tr{animation:fadeIn .3s ease}
 .settings-inner-block:first-of-type{padding-top:0;margin-top:0;border-top:0}
 
 /* Main requested accordion */
-.nav-accordion{border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;background:#000;box-shadow:none;margin:2px 0 4px}
-.nav-accordion-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px;background:#000;color:#fff;border:0;border-bottom:1px solid #2a2a2a;font:600 13px inherit;cursor:pointer}
-.nav-accordion-title{display:inline-flex;align-items:center;gap:8px}.nav-accordion-ic{font-size:18px}.nav-accordion-arrow{font-size:19px;transition:transform .2s}.nav-accordion-body{max-height:0;overflow:hidden;transition:max-height .25s ease;background:#000}.nav-accordion.open .nav-accordion-body{max-height:min(520px,60vh);overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}.nav-accordion.open .nav-accordion-arrow{transform:rotate(180deg)}.nav-accordion-body .nav-item{border-radius:0!important;border:0!important;border-bottom:1px solid #1d1d1d!important;background:#000!important;margin:0!important}.nav-accordion-body .nav-item:last-child{border-bottom:0!important}.nav-accordion-body .nav-item.active{background:#000!important;color:#fff!important;box-shadow:inset 3px 0 0 #fff}.nav-accordion-body .nav-item:hover{background:#000!important}
+.nav-accordion{border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;background:#000;box-shadow:none;margin:2px 0 4px;flex:0 0 auto}
+.nav-accordion-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px;background:#000;color:#fff;border:0;border-bottom:1px solid #2a2a2a;font:600 13px inherit;cursor:pointer;flex-shrink:0}
+.nav-accordion-title{display:inline-flex;align-items:center;gap:8px}.nav-accordion-ic{font-size:18px}.nav-accordion-arrow{font-size:19px;transition:transform .2s}
+/* Do not cap an open accordion to vh/max-height: iOS Safari can calculate that
+   incorrectly and clip the last links. Expanded links join the one .sb-nav scroller. */
+.nav-accordion-body{max-height:0;overflow:hidden;transition:max-height .25s ease;background:#000}
+.nav-accordion.open .nav-accordion-body{max-height:none;overflow:visible;overscroll-behavior:contain}
+.nav-accordion.open .nav-accordion-arrow{transform:rotate(180deg)}.nav-accordion-body .nav-item{border-radius:0!important;border:0!important;border-bottom:1px solid #1d1d1d!important;background:#000!important;margin:0!important}.nav-accordion-body .nav-item:last-child{border-bottom:0!important}.nav-accordion-body .nav-item.active{background:#000!important;color:#fff!important;box-shadow:inset 3px 0 0 #fff}.nav-accordion-body .nav-item:hover{background:#000!important}
 [data-theme="light"] .nav-accordion{background:#fff;border-color:#cfcfcf;box-shadow:none}[data-theme="light"] .nav-accordion-head{background:#fff;color:#000;border-color:#d8d8d8}[data-theme="light"] .nav-accordion-body{background:#fff}[data-theme="light"] .nav-accordion-body .nav-item{background:#fff!important;border-bottom-color:#e6e6e6!important;color:#333}[data-theme="light"] .nav-accordion-body .nav-item.active{background:#fff!important;color:#000!important;box-shadow:inset 3px 0 0 #000}
 
 /* Node selector inside Node inbound editor */
