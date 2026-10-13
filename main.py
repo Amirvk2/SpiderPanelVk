@@ -3434,16 +3434,16 @@ def generate_custom_ip_configs(user_id: str, user: dict) -> dict:
 
 
 def generate_status_config(user: dict, configs: list) -> str:
-    """Generate a status config (config-status) with fake random stats.
+    """Generate a status config (config-status) with real stats from user data.
 
     This config is placed FIRST in the subscription so clients display it as
     the status/overview config. It uses the panel's main domain and carries
-    fake volume/time/user-count in the remark for easy reading.
+    real volume/time/user-count in the remark for easy reading.
 
     The address is the panel domain (not external_domain) and host/sni are
     also the panel domain so TLS handshake reaches the panel.
     """
-    import random
+    from datetime import datetime
 
     # Get user info
     username = user.get("username", "user")
@@ -3455,20 +3455,34 @@ def generate_status_config(user: dict, configs: list) -> str:
     if not panel_domain:
         return ""
 
-    # Generate fake stats for the status config
-    # Random volume: 100GB - 500GB total, 10GB - 100GB used
-    total_gb = random.randint(100, 500)
-    used_gb = random.randint(10, min(100, total_gb - 1))
+    # Use actual user traffic data instead of random values
+    used_bytes = user.get("traffic_used_bytes", 0)
+    limit_bytes = user.get("traffic_limit_bytes", 0)
 
-    # Random expiry: 30-365 days
-    expire_days = random.randint(30, 365)
+    # Convert bytes to GB (1 GB = 1024^3 bytes)
+    GB = 1024 ** 3
+    total_gb = limit_bytes / GB if limit_bytes > 0 else 500
+    used_gb = used_bytes / GB
 
-    # Random concurrent users: 1-10
-    online_users = random.randint(1, 10)
+    # Calculate actual days remaining from expire_at instead of random value
+    expire_days = 30  # default fallback
+    _exp = user.get("expire_at")
+    if _exp:
+        try:
+            expire_date = datetime.fromisoformat(_exp)
+            delta = expire_date - datetime.now()
+            expire_days = max(0, delta.days)
+        except Exception:
+            pass
 
-    # Build remark with fake stats (status config identifier)
+    # Use actual concurrent connections instead of random value
+    online_users = user.get("concurrent_connections", 0)
+    if online_users is None:
+        online_users = 0
+
+    # Build remark with real stats (status config identifier)
     # Format: "📊 Status | User: {username} | Used: {used}GB/{total}GB | Days: {days} | Online: {online}"
-    remark_text = f"📊 Status | User: {username} | Used: {used_gb}GB/{total_gb}GB | Days: {expire_days} | Online: {online_users}"
+    remark_text = f"📊 Status | User: {username} | Used: {used_gb:.1f}GB/{total_gb:.1f}GB | Days: {expire_days} | Online: {online_users}"
     remark = quote(remark_text)
 
     # Try to find a TLS WS/XHTTP config to copy transport from
