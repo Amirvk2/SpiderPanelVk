@@ -5,7 +5,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Spider Panel v10</title>
+<title>Spider Panel v11</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -706,6 +706,25 @@ tr{animation:fadeIn .3s ease}
   font-size:15px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;
   transition:all .2s;z-index:5;box-shadow:0 4px 12px rgba(0,0,0,.3)}
 .modal-x:hover{background:var(--red);color:#fff;border-color:var(--red);transform:rotate(90deg)}
+.help-ech-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.help-ech-picker-btn{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.help-ech-current{font-size:10px;opacity:.76;padding:3px 6px;border-radius:6px;background:var(--bg3)}
+.ech-picker-modal{background:rgba(18,20,26,.88);border-color:rgba(255,255,255,.17);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px)}
+.ech-preset-list{display:flex;flex-direction:column;gap:9px;max-height:56vh;overflow-y:auto;padding:2px}
+.ech-preset-option{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;border-radius:13px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.055);color:var(--txt);text-align:right;cursor:pointer;transition:background .18s,border-color .18s,transform .18s}
+.ech-preset-option:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3)}
+.ech-preset-option:active{transform:scale(.99)}
+.ech-preset-option.selected{border-color:var(--neon);background:rgba(0,225,193,.09)}
+.ech-preset-main{display:flex;flex:1;flex-direction:column;align-items:flex-start;gap:5px;min-width:0}
+.ech-preset-main strong{font-size:13px}
+.ech-preset-main code{display:block;max-width:100%;font:10px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--txt2);direction:ltr;text-align:left;overflow-wrap:anywhere;user-select:text;-webkit-user-select:text}
+.ech-preset-check{flex-shrink:0;color:var(--neon);opacity:0;font-size:20px}
+.ech-preset-option.selected .ech-preset-check{opacity:1}
+[data-theme="light"] .ech-picker-modal{background:rgba(255,255,255,.92);border-color:rgba(0,0,0,.14)}
+[data-theme="light"] .ech-preset-option{background:rgba(0,0,0,.025);border-color:rgba(0,0,0,.12)}
+[data-theme="light"] .ech-preset-option.selected{background:rgba(0,0,0,.06);border-color:#000}
+[data-theme="light"] .ech-preset-main code{color:#444}
+@media(max-width:520px){.help-ech-row{align-items:flex-start!important;flex-wrap:wrap}.help-ech-actions{width:100%;justify-content:space-between}.help-ech-picker-btn{flex:1;justify-content:center}.ech-picker-modal{padding:20px!important}.ech-preset-list{max-height:52vh}}
 
 /* Form fields */
 .f-g{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;flex:1}
@@ -1255,6 +1274,192 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 #tab-suggest .suggest-link-list a:hover{border-color:var(--border-glow);background:var(--nav-bg)}
 #tab-suggest .suggest-link-list .material-symbols-outlined{flex:0 0 auto;font-size:15px;color:var(--txt2)}
 
+/* ════════ Tunnel Management (TM) ════════ */
+/* Short "TM" badge in the main sidebar nav — only shown on narrow screens where
+   the label has to truncate. */
+.nav-short{display:none;margin-left:auto;padding:2px 7px;border-radius:8px;background:rgba(22,163,74,.14);color:var(--green);font:800 9px/1.4 inherit;letter-spacing:.8px;flex-shrink:0}
+@media(max-width:900px){.nav-short{display:inline-flex}}
+/* Secondary navigation inside the TM tab */
+.tm-subnav{display:flex;align-items:center;gap:6px;margin-bottom:10px;background:#0a0a0d;border:1px solid var(--border);border-radius:14px;padding:6px}
+.tm-subtab{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 8px;border:1px solid transparent;border-radius:10px;background:transparent;color:var(--txt2);font:600 12.5px inherit;cursor:pointer;min-height:44px;transition:all .2s}
+.tm-subtab .material-symbols-outlined{font-size:16px}
+.tm-subtab.active{background:var(--neon);color:var(--tab-color)}
+.tm-subtab-short{margin-left:auto;margin-right:8px;font:800 10px/1.2 inherit;letter-spacing:1.5px;color:var(--txt2);text-transform:uppercase;flex-shrink:0}
+@media(max-width:640px){.tm-subnav{padding:5px;gap:4px}.tm-subtab{min-height:42px;padding:9px 6px;font-size:12px}}
+
+/* Status strip */
+.tm-statusbar{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:9px 12px;margin-bottom:10px;background:#0a0a0d;border:1px solid var(--border);border-radius:12px;font-size:11px;color:var(--txt2)}
+.tm-statusbar b{color:var(--txt);font-weight:700}
+.tm-sb-last{margin-left:auto}
+.tm-sb-state.ok{color:var(--green)!important}.tm-sb-state.err{color:var(--red)!important}.tm-sb-state.idle{color:var(--txt2)!important}
+.tm-sb-bal{background:rgba(22,163,74,.12);border-radius:10px;padding:2px 8px;color:var(--green)}
+.tm-sb-chain-ping{display:flex;align-items:center;gap:5px}
+.tm-sb-chain-ping b{font-weight:800;color:var(--neon)}
+.tm-sb-chain-ping b.off{color:var(--txt2)}
+.tm-sb-chain-ping .tm-edge-ping{padding:1px 2px}
+@media(max-width:640px){.tm-statusbar{font-size:10.5px;padding:8px 10px}.tm-sb-last{margin-left:0;width:100%}}
+
+/* Server accordion (reuses spd-acc) */
+.tm-servers{display:flex;flex-direction:column;gap:8px}
+.tm-server-acc .spd-acc-title b{font-size:13px}
+.tm-server-kv{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:5px 0;font-size:12px;color:var(--txt2)}
+.tm-server-kv b{color:var(--txt);word-break:break-word}
+.node-status-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:14px;font-size:10px;font-weight:700;white-space:nowrap}
+.node-status-pill::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+.node-online{background:rgba(22,163,74,.14);color:var(--green)}
+.node-offline{background:rgba(255,35,82,.13);color:var(--red)}
+.node-checking{background:rgba(255,171,0,.12);color:var(--warning)}
+.node-unauth{background:rgba(255,171,0,.12);color:var(--warning)}
+.node-editing{background:rgba(123,97,255,.14);color:var(--purple)}
+
+/* Toolbar */
+.tm-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.tm-toolbar-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.tm-auto{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:12px;border:1px solid var(--border);background:#0a0a0d;font:700 11px inherit;color:var(--txt2)}
+.tm-auto .material-symbols-outlined{font-size:15px;color:var(--green)}
+.tm-auto.busy{color:var(--warning)}
+.tm-auto.busy .material-symbols-outlined{color:var(--warning);animation:tmPingPulse .9s infinite}
+.tm-auto.err{color:var(--red)}
+.tm-auto.err .material-symbols-outlined{color:var(--red)}
+.tm-hintbar{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:10.5px;color:var(--txt2);margin:0 2px 8px}
+.tm-mode{font-weight:700;color:var(--purple);white-space:nowrap;min-height:14px}
+@media(max-width:640px){.tm-toolbar-group{width:100%}}
+
+/* Canvas */
+.tm-canvas-wrap{position:relative;background:#0a0a0d;border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.55)}
+.tm-canvas{position:relative;height:460px;touch-action:none;overflow:hidden;cursor:grab;
+  background-image:
+    linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px);
+  background-size:200px 200px,200px 200px,40px 40px,40px 40px}
+.tm-canvas.connect{cursor:crosshair}
+.tm-edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.tm-edge{fill:none;stroke:var(--neon);stroke-width:2.4;pointer-events:stroke;cursor:pointer}
+.tm-edge.straight{stroke-linecap:round}
+.tm-edge.curved{stroke-linecap:round}
+.tm-edge.idle-edge{stroke:rgba(255,255,255,.34)}
+.tm-edge.active-edge{stroke:var(--neon)}
+.tm-edge.selected{stroke:var(--red);stroke-width:3}
+.tm-edge-hit{fill:none;stroke:transparent;stroke-width:14;pointer-events:stroke}
+.tm-edge-label{position:absolute;transform:translate(-50%,-50%);display:flex;gap:4px;background:#0e0e12;border:1px solid var(--border);border-radius:9px;padding:2px 6px;font-size:9px;color:var(--txt2);pointer-events:auto;white-space:nowrap;z-index:2}
+.tm-edge-label button{background:none;border:0;color:var(--txt2);cursor:pointer;font:inherit;padding:0;display:flex}
+.tm-edge-label button:hover{color:var(--red)}
+.tm-edge-label .material-symbols-outlined{font-size:13px}
+/* A bar is draggable: grabbing it moves both of its endpoints. */
+.tm-edge-label.draggable{cursor:grab;touch-action:none}
+.tm-edge-label.dragging{background:#141419;border-color:var(--neon);cursor:grabbing}
+/* Snapping hint while a bar's end is pulled near a box. */
+.tm-node.snap-target{border-color:var(--green);box-shadow:0 0 0 2px rgba(22,163,74,.35), 0 6px 20px rgba(0,0,0,.6)}
+/* The free end of a bar being dragged: drawn live while the pointer moves. */
+.tm-edge-dangle{fill:none;stroke:var(--txt2);stroke-width:2;stroke-dasharray:5 4;opacity:.8;pointer-events:none}
+.tm-edge-handle{position:absolute;z-index:4;width:12px;height:12px;border-radius:50%;background:var(--neon);border:2px solid #0e0e12;box-shadow:0 0 0 2px rgba(22,163,74,.4);transform:translate(-50%,-50%);pointer-events:none}
+/* Per-node collapsed layout: the box shows only its head until expanded. */
+.tm-node.collapsed .tm-node-info{display:none}
+.tm-node{position:absolute;min-width:168px;max-width:216px;z-index:2;background:#0e0e12;border:1px solid var(--border);border-radius:14px;padding:9px 10px;cursor:grab;user-select:none;-webkit-user-select:none;box-shadow:0 6px 20px rgba(0,0,0,.6);transition:box-shadow .15s, border-color .15s;touch-action:none}
+.tm-node.dragging{z-index:5;cursor:grabbing;box-shadow:0 14px 40px rgba(0,0,0,.85)}
+.tm-node.set-node{border-color:var(--neon);box-shadow:0 0 0 1px var(--neon), 0 6px 20px rgba(0,0,0,.6)}
+.tm-node.connect-src{border-color:var(--purple);box-shadow:0 0 0 1px var(--purple), 0 6px 20px rgba(0,0,0,.6)}
+.tm-node-head{display:flex;align-items:flex-start;gap:6px}
+.tm-node-title{flex:1;min-width:0;font:700 12px inherit;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tm-node-role{font:600 9px inherit;letter-spacing:.4px;text-transform:uppercase;color:var(--txt2);margin-top:2px}
+.tm-node-role.initial{color:var(--green)}.tm-node-role.final{color:var(--blue)}.tm-node-role.middle{color:var(--purple)}.tm-node-role.initial_final{color:var(--neon)}
+.tm-node-lat{font:700 10px inherit;color:var(--neon);white-space:nowrap}
+.tm-node-lat.off{color:var(--red)}
+.tm-node-btn{width:24px;height:24px;flex-shrink:0;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--txt2);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.tm-node-btn:hover{color:var(--neon);border-color:var(--border-glow)}
+.tm-node-btn .material-symbols-outlined{font-size:14px}
+.tm-node-info{display:none;margin-top:7px;padding-top:7px;border-top:1px solid var(--border)}
+.tm-node.open .tm-node-info{display:block}
+.tm-node-info .tm-server-kv{padding:2px 0;font-size:11px}
+.tm-node-actions{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap}
+.tm-node-actions .btn-sm{padding:5px 9px;font-size:10.5px}
+.tm-set-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(22,163,74,.14);color:var(--green);border-radius:14px;padding:2px 8px;font-size:9px;font-weight:800;margin-top:5px}
+@media(max-width:640px){.tm-canvas{height:400px}.tm-node{min-width:148px;max-width:190px;padding:8px 8px}.tm-node-title{font-size:11px}}
+
+/* Zoom controls: bottom-right */
+.tm-zoom{position:absolute;bottom:12px;right:12px;display:flex;flex-direction:column;gap:7px;z-index:6}
+.tm-zoom button{width:40px;height:40px;border-radius:12px;border:1px solid var(--border);background:#0e0e12;color:var(--txt);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.6);touch-action:manipulation}
+.tm-zoom button:hover{border-color:var(--border-glow);color:var(--neon)}
+.tm-zoom button:active{transform:scale(.94)}
+.tm-zoom .material-symbols-outlined{font-size:19px}
+
+/* Apply progress */
+.tm-progress{margin-top:10px;display:none;border:1px solid var(--border);border-radius:12px;background:#0a0a0d;padding:10px 12px;font-size:12px;direction:ltr;text-align:left}
+.tm-progress.show{display:block}
+.tm-progress-step{display:flex;align-items:center;gap:8px;padding:3px 0;color:var(--txt2)}
+.tm-progress-step.ok{color:var(--green)}
+.tm-progress-step.fail{color:var(--red)}
+.tm-progress-step .material-symbols-outlined{font-size:15px}
+
+/* Latency cards: client vs server clearly separated */
+.tm-latency{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.tm-lat-card{background:#0a0a0d;border:1px solid var(--border);border-radius:14px;padding:12px}
+.tm-lat-h{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--txt);margin-bottom:8px}
+.tm-lat-h .material-symbols-outlined{font-size:16px;color:var(--neon)}
+.tm-lat-tag{margin-left:auto;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap}
+.tm-lat-tag-client{background:rgba(22,163,74,.14);color:var(--green)}
+.tm-lat-tag-server{background:rgba(123,97,255,.14);color:var(--purple)}
+.tm-lat-body{display:flex;flex-direction:column;gap:5px;font-size:12px}
+.tm-lat-row{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--txt2)}
+.tm-lat-row b{color:var(--txt);font-weight:700}
+.tm-lat-ms{color:var(--neon);font-weight:800}
+.tm-lat-ms.off{color:var(--red)}
+.tm-lat-ms.small{font-size:11px}
+@media(max-width:640px){.tm-latency{grid-template-columns:1fr}}
+
+/* Generated config preview */
+.tm-preview{margin-top:12px}
+.tm-preview .cfg-code{margin-bottom:10px;max-height:150px}
+
+/* Link keys on a graph node: the one on the head makes this box the
+   destination, the one on the tail makes it the source. */
+.tm-link-key{position:absolute;display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:#0e0e12;color:var(--txt2);cursor:pointer;z-index:6;box-shadow:0 3px 10px rgba(0,0,0,.6);transition:transform .15s,color .15s,border-color .15s}
+.tm-link-key:hover{color:var(--neon);border-color:var(--border-glow);transform:scale(1.08)}
+.tm-link-key .material-symbols-outlined{font-size:15px}
+.tm-link-key.to{top:50%;left:-13px;transform:translateY(-50%)}   /* this box becomes the destination */
+.tm-link-key.from{top:50%;right:-13px;transform:translateY(-50%)} /* this box becomes the source */
+.tm-link-key.to:hover{color:var(--green)}
+.tm-link-key.from:hover{color:var(--purple)}
+.tm-link-key.hot{color:var(--neon);border-color:var(--neon);animation:tmPulse 1.2s infinite}
+@keyframes tmPulse{0%,100%{box-shadow:0 3px 10px rgba(0,0,0,.6)}50%{box-shadow:0 0 0 5px rgba(22,163,74,.18)}}
+
+/* Chain ping on the connection bar itself: a tiny inline SVG that pings when
+   tapped; the measured value sits in the bar's label. */
+.tm-edge-ping{display:flex;align-items:center;gap:3px;background:none;border:0;padding:1px 3px;color:var(--txt2);cursor:pointer}
+.tm-edge-ping:hover{color:var(--neon)}
+.tm-edge-ping svg{width:12px;height:12px}
+.tm-edge-ping.busy .tm-link-ping-svg{animation:tmPingPulse .9s infinite}
+@keyframes tmPingPulse{0%,100%{opacity:.45}50%{opacity:1}}
+.tm-edge-label b{font-weight:800;color:var(--neon)}
+
+/* Connection modal reuses modal system */
+.tm-connect-row{display:flex;flex-direction:column;gap:10px;font-size:13px}
+.tm-connect-row .f-g{margin:0}
+.tm-connect-head{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt2)}
+.tm-connect-head b{color:var(--txt)}
+.tm-connect-arrow{color:var(--neon)}
+
+/* Node list inside the connection picker (touch friendly rows) */
+.tm-pick-row{display:flex;align-items:center;gap:9px;width:100%;min-height:46px;padding:9px 11px;border:1px solid var(--border);border-radius:11px;background:var(--input-bg);color:var(--txt);font:600 12.5px inherit;cursor:pointer;text-align:start}
+.tm-pick-row:hover{border-color:var(--border-glow)}
+.tm-pick-row + .tm-pick-row{margin-top:7px}
+.tm-pick-dot{width:8px;height:8px;border-radius:50%;background:var(--txt2);flex-shrink:0}
+.tm-pick-dot.on{background:var(--green)}
+.tm-pick-dot.off{background:var(--red)}
+.tm-pick-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tm-pick-ping{color:var(--neon);font-weight:800;font-size:11px;white-space:nowrap}
+.tm-pick-ping.off{color:var(--red)}
+.tm-pick-role{font-size:9px;color:var(--txt2);font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+
+/* Server accordion cards in the Server section */
+.tm-server-head-role{font-size:9px;color:var(--txt2);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-top:3px}
+.tm-server-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+.tm-server-actions .btn-sm{min-height:38px;padding:7px 12px;font-size:11.5px}
+.tm-srv-ping{font:700 11px inherit;color:var(--neon);white-space:nowrap}
+.tm-srv-ping.off{color:var(--red)}
+.tm-srv-ping.busy{color:var(--warning)}
 </style>
 </head>
 <body>
@@ -1304,7 +1509,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
       <img src="/static/spider-logo.svg" alt="Spider" onerror="this.style.display='none'" style="width:56px;height:56px;flex-shrink:0">
       <div>
         <div class="sb-brand-t"><span>S</span>PIDER</div>
-        <div class="sb-brand-s">PANEL v10</div>
+        <div class="sb-brand-s">PANEL v11</div>
       </div>
     </div>
     <nav class="sb-nav">
@@ -1351,6 +1556,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
             <span class="nav-ic"><span class="material-symbols-outlined" style="font-size:18px">travel_explore</span></span>
             <span data-i18n="proxy.nav">پروکسی</span>
           </div>
+          <div class="nav-item" id="nav-tm" onclick="switchTab('tm',this)">
+            <span class="nav-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="6" r="2.4"/><circle cx="12" cy="12" r="2.4"/><circle cx="19" cy="18" r="2.4"/><line x1="7" y1="7.6" x2="10" y2="10.4"/><line x1="14" y1="13.6" x2="17" y2="16.4"/></svg></span>
+            <span data-i18n="tm.nav">Tunnel Management</span>
+            <span class="nav-short">TM</span>
+          </div>
         </div>
       </div>
 
@@ -1396,7 +1606,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
         <span data-i18n="logout">خروج</span>
       </div>
     </nav>
-    <div class="sb-foot"><span class="dot"></span> Spider Panel v10</div>
+    <div class="sb-foot"><span class="dot"></span> Spider Panel v11</div>
   </aside>
 
   <!-- MAIN -->
@@ -2141,6 +2351,118 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
         </div>
       </div>
 
+      <!-- TUNNEL MANAGEMENT TAB -->
+      <div class="tab-content hidden" id="tab-tm">
+        <!-- Secondary navigation: Server / Configure. Stays inside TM. -->
+        <div class="tm-subnav" id="tm-subnav" role="tablist">
+          <button class="tm-subtab active" type="button" role="tab" aria-selected="true" data-tm-section="server" onclick="tmSetSection('server')">
+            <span class="material-symbols-outlined">dns</span>
+            <span data-i18n="tm.server">Server</span>
+          </button>
+          <button class="tm-subtab" type="button" role="tab" aria-selected="false" data-tm-section="configure" onclick="tmSetSection('configure')">
+            <span class="material-symbols-outlined">hub</span>
+            <span data-i18n="tm.configure">Configure</span>
+          </button>
+          <span class="tm-subtab-short" data-i18n="tm.short">TM</span>
+        </div>
+
+        <!-- TM status strip -->
+        <div class="tm-statusbar" id="tm-statusbar">
+          <span class="tm-sb-item"><b id="tm-sb-state">—</b></span>
+          <span class="tm-sb-item"><span data-i18n="tm.servers">Servers</span> <b id="tm-sb-servers">0</b></span>
+          <span class="tm-sb-item"><span data-i18n="tm.links">Links</span> <b id="tm-sb-links">0</b></span>
+          <span class="tm-sb-item"><span data-i18n="tm.entry">Entry</span> <b id="tm-sb-entry">—</b></span>
+          <span class="tm-sb-item"><span data-i18n="tm.exit">Exit</span> <b id="tm-sb-exit">—</b></span>
+          <!-- Entry → exit latency, measured by the servers themselves. -->
+          <span class="tm-sb-item tm-sb-chain-ping">
+            <span data-i18n="tm.chainPing">Chain</span>
+            <b id="tm-sb-chain-ping" dir="ltr">—</b>
+            <button type="button" class="tm-edge-ping" id="tm-sb-chain-ping-btn"
+              onclick="tmChainPing()" title="entry → exit"
+              aria-label="chain ping">
+              <svg class="tm-link-ping-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+                <path d="M2 12h4"/><path d="M18 12h4"/>
+                <path d="M8 12a4 4 0 0 1 8 0" opacity=".55"/>
+                <path d="M6 12a6 6 0 0 1 12 0" opacity=".3"/>
+                <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>
+              </svg>
+            </button>
+          </span>
+          <span class="tm-sb-item tm-sb-bal hidden" id="tm-sb-bal"><span data-i18n="tm.balancer">Balancer</span> <b id="tm-sb-chain">—</b></span>
+          <span class="tm-sb-item tm-sb-last"><span data-i18n="tm.lastApply">Last Apply</span> <b id="tm-sb-apply">—</b></span>
+        </div>
+
+        <!-- ════════ SECTION: SERVER ════════ -->
+        <div class="tm-section" id="tm-section-server">
+          <div class="panel">
+            <div class="panel-h" style="justify-content:space-between">
+              <span class="glow"><span data-i18n="tm.title">Tunnel Management</span> · <span data-i18n="tm.server">Server</span></span>
+              <button class="btn btn-p" type="button" onclick="tmOpenServerModal()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span data-i18n="tm.addServer">Add Server</span>
+              </button>
+            </div>
+            <div class="px-hint" data-i18n="tm.serverHint">Each server is a real SpiderPanel Node. The API key is stored server-side only and is never sent to the browser.</div>
+            <div class="tm-servers" id="tm-server-list">
+              <div class="empty" data-i18n="loading">در حال بارگذاری...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════════ SECTION: CONFIGURE ════════ -->
+        <div class="tm-section hidden" id="tm-section-configure">
+          <div class="tm-toolbar">
+            <div class="tm-toolbar-group">
+              <!-- Everything here is automatic: a valid edit is pushed to the
+                   servers by itself, and the chain is validated by the same
+                   code that performs the push. -->
+              <span class="tm-auto" id="tm-auto-state">
+                <span class="material-symbols-outlined">bolt</span>
+                <span data-i18n="tm.auto">Auto</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="tm-hintbar">
+            <span data-i18n="tm.configureHint">Long-press a box to move it · drag a line to move it, drag its end near another box to snap them together · the two keys on each box connect it.</span>
+            <span class="tm-mode" id="tm-mode-label"></span>
+          </div>
+
+          <!-- Graph canvas -->
+          <div class="tm-canvas-wrap" id="tm-canvas-wrap">
+            <div class="tm-canvas" id="tm-canvas">
+              <!-- No arrow heads: the line only suggests the link, the roles on
+                   the boxes say which way the traffic runs. -->
+              <svg class="tm-edges" id="tm-edges" xmlns="http://www.w3.org/2000/svg">
+                <g id="tm-edge-layer"></g>
+              </svg>
+              <div class="tm-nodes" id="tm-node-layer"></div>
+            </div>
+
+            <!-- Zoom controls: bottom-right, always available -->
+            <div class="tm-zoom" id="tm-zoom">
+              <button type="button" aria-label="zoom in" onclick="tmZoomButton(1.18)"><span class="material-symbols-outlined">add</span></button>
+              <button type="button" aria-label="zoom out" onclick="tmZoomButton(1/1.18)"><span class="material-symbols-outlined">remove</span></button>
+              <button type="button" aria-label="fit to screen" onclick="tmFit()"><span class="material-symbols-outlined">fit_screen</span></button>
+            </div>
+
+            <!-- Progress / result log -->
+            <div class="tm-progress" id="tm-progress"></div>
+          </div>
+
+          <!-- Generated route preview -->
+          <div class="tm-preview panel">
+            <div class="panel-h"><span class="glow"><span data-i18n="tm.generated">Generated client route</span></span></div>
+            <div class="px-hint" data-i18n="tm.generatedHint">This is exactly what a user assigned to the TM inbound receives. Set determines which server the client dials.</div>
+            <pre class="cfg-code" id="tm-config-preview" dir="ltr">—</pre>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-g btn-sm" type="button" onclick="tmGenerate()"><span class="material-symbols-outlined" style="font-size:14px">refresh</span><span data-i18n="tm.regenerate">Regenerate</span></button>
+              <button class="btn btn-g btn-sm" type="button" onclick="tmCopyConfig()"><span class="material-symbols-outlined" style="font-size:14px">content_copy</span><span data-i18n="copy">Copy</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
 <!-- CONTACT TAB -->
       <div class="tab-content hidden" id="tab-contact">
         <div class="panel contact-panel">
@@ -2208,7 +2530,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
               <button type="button" class="spd-acc-head" onclick="spdToggleAcc('help-config-options',this)" aria-expanded="false"><span class="spd-acc-title"><strong data-i18n="helpConfigOptions">تنظیمات کانفیگ</strong></span><span class="material-symbols-outlined spd-acc-arrow">expand_more</span></button>
               <div class="spd-acc-body" id="acc-help-config-options">
                 <div class="px-hint" data-i18n="helpFeatureHint">این گزینه‌ها فقط به کانفیگ‌های اینباند پیش‌فرض TLS + WS افزوده می‌شوند.</div>
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)"><div><strong data-i18n="helpEch">افزودن ECH</strong><div class="px-hint" data-i18n="helpEchHint">پارامتر ECH را به کانفیگ‌های TLS + WS پیش‌فرض اضافه می‌کند.</div></div><button type="button" class="ios-switch" id="help-ech-switch" role="switch" aria-checked="false" onclick="toggleHelpFeature('ech',this)"></button></div>
+                <div class="help-ech-row" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+                  <div style="flex:1;min-width:0"><strong data-i18n="helpEch">افزودن ECH</strong><div class="px-hint" data-i18n="helpEchHint">پارامتر ECH را به کانفیگ‌های TLS + WS پیش‌فرض اضافه می‌کند.</div></div>
+                  <div class="help-ech-actions">
+                    <button type="button" class="btn btn-g btn-sm help-ech-picker-btn" onclick="openEchPresetPicker()" aria-haspopup="dialog" aria-controls="mod-ech-picker"><span data-i18n="helpEchChoose">انتخاب ECH</span><span class="help-ech-current" id="help-ech-preset-label">CF Config</span><span class="material-symbols-outlined" style="font-size:16px">expand_more</span></button>
+                    <button type="button" class="ios-switch" id="help-ech-switch" role="switch" aria-checked="false" onclick="toggleHelpFeature('ech',this)"></button>
+                  </div>
+                </div>
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)"><div><strong data-i18n="helpFf">افزودن F+F</strong><div class="px-hint" data-i18n="helpFfHint">مجموعه cipher و تنظیمات fragment نمونه را به کانفیگ‌های TLS + WS پیش‌فرض اضافه می‌کند.</div></div><button type="button" class="ios-switch" id="help-ff-switch" role="switch" aria-checked="false" onclick="toggleHelpFeature('ff',this)"></button></div>
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0">
                   <div style="flex:1;min-width:0">
@@ -2492,6 +2820,59 @@ IMPLEMENTATION RULES
   </div>
 </div></div>
 
+<!-- TM SERVER EDITOR (create / edit a real SpiderPanel Node) -->
+<div class="modal" id="mod-tm-server"><div class="modal-c" style="max-width:440px">
+  <div class="modal-t"><span class="glow" id="tm-server-modal-title" data-i18n="tm.addServerTitle">Add TM server</span></div>
+  <form onsubmit="tmSubmitServer(event)">
+    <div class="f-g"><label data-i18n="tm.serverName">Display name</label>
+      <input type="text" id="tm-srv-name" dir="ltr" autocomplete="off" placeholder="Germany 1"></div>
+    <div class="f-g"><label data-i18n="tm.serverDomain">Server panel domain</label>
+      <input type="text" id="tm-srv-domain" dir="ltr" autocomplete="off" required placeholder="vpn.example.com"></div>
+    <div class="f-g"><label data-i18n="tm.spiKey">API key (server)</label>
+      <input type="password" id="tm-srv-key" dir="ltr" autocomplete="new-password" placeholder="spdr_xxxxxxxxx"></div>
+    <div class="px-hint" id="tm-srv-key-hint" data-i18n="tm.keyHint">When editing, leave the key empty to keep the stored one.</div>
+    <div class="modal-btns">
+      <button type="button" class="btn btn-g" onclick="closeModal('mod-tm-server')"><span data-i18n="cancel">Cancel</span></button>
+      <button type="submit" class="btn btn-p" id="tm-srv-submit"><span data-i18n="saveChanges">Save</span></button>
+    </div>
+  </form>
+</div></div>
+
+<style>
+/* Keep this picker frosted even under the panel's later monochrome modal overrides. */
+#mod-ech-picker.modal{backdrop-filter:blur(10px)!important;-webkit-backdrop-filter:blur(10px)!important}
+#mod-ech-picker .ech-picker-modal{background:rgba(18,20,26,.84)!important;border-color:rgba(255,255,255,.18)!important;backdrop-filter:blur(24px)!important;-webkit-backdrop-filter:blur(24px)!important;box-shadow:0 16px 48px rgba(0,0,0,.42)!important}
+#mod-ech-picker .ech-preset-option{background:rgba(255,255,255,.055);border-color:rgba(255,255,255,.14)}
+#mod-ech-picker .ech-preset-option.selected{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.6)}
+[data-theme="light"] #mod-ech-picker .ech-picker-modal{background:rgba(255,255,255,.84)!important;border-color:rgba(0,0,0,.16)!important;box-shadow:0 16px 48px rgba(0,0,0,.14)!important}
+[data-theme="light"] #mod-ech-picker .ech-preset-option{background:rgba(0,0,0,.025);border-color:rgba(0,0,0,.12)}
+[data-theme="light"] #mod-ech-picker .ech-preset-option.selected{background:rgba(0,0,0,.07);border-color:#000}
+</style>
+
+<!-- ECH PRESET PICKER -->
+<div class="modal" id="mod-ech-picker" role="dialog" aria-modal="true" aria-labelledby="ech-picker-title" onclick="if(event.target===this)closeModal('mod-ech-picker')">
+  <div class="modal-c ech-picker-modal" style="max-width:500px">
+    <button type="button" class="modal-x" onclick="closeModal('mod-ech-picker')" aria-label="Close">×</button>
+    <div class="modal-t"><span class="glow" id="ech-picker-title" data-i18n="helpEchPickerTitle">ECH List</span></div>
+    <div class="px-hint" data-i18n="helpEchPickerHint" style="margin:-8px 0 14px">یک مقدار را انتخاب کنید؛ با فعال کردن ECH همین مقدار در کانفیگ‌ها استفاده می‌شود.</div>
+    <div class="ech-preset-list">
+      <button type="button" class="ech-preset-option" data-ech-preset="cf-config" onclick="selectEchPreset('cf-config')">
+        <span class="ech-preset-main"><strong>CF Config</strong><code dir="ltr">AEX+DQBBXgAgACBsvLac2HVdvp+J2QTKPNjn24b5D6yHyxAcG0m+cmDcXAAEAAEAAQASY2xvdWRmbGFyZS1lY2guY29tAAA=</code></span><span class="material-symbols-outlined ech-preset-check">check_circle</span>
+      </button>
+      <button type="button" class="ech-preset-option" data-ech-preset="crypto-cloudflare" onclick="selectEchPreset('crypto-cloudflare')">
+        <span class="ech-preset-main"><strong>CF DNS</strong><code dir="ltr">crypto.cloudflare.com+udp://8.8.8.8</code></span><span class="material-symbols-outlined ech-preset-check">check_circle</span>
+      </button>
+      <button type="button" class="ech-preset-option" data-ech-preset="ridanbe" onclick="selectEchPreset('ridanbe')">
+        <span class="ech-preset-main"><strong>Ridanbe</strong><code dir="ltr">ridanbe.net+udp://8.8.8.8</code></span><span class="material-symbols-outlined ech-preset-check">check_circle</span>
+      </button>
+      <button type="button" class="ech-preset-option" data-ech-preset="iranva" onclick="selectEchPreset('iranva')">
+        <span class="ech-preset-main"><strong>Iranva</strong><code dir="ltr">iranva.ir+udp://1.1.1.1</code></span><span class="material-symbols-outlined ech-preset-check">check_circle</span>
+      </button>
+    </div>
+    <div class="modal-btns"><button type="button" class="btn btn-g" onclick="closeModal('mod-ech-picker')" data-i18n="close">بستن</button></div>
+  </div>
+</div>
+
 <!-- QR MODAL -->
 <div class="modal" id="mod-qr"><div class="modal-c" style="max-width:340px;text-align:center">
   <div class="modal-t"><span class="glow" data-i18n="qrCode">QR Code</span></div>
@@ -2528,6 +2909,7 @@ var I18N = {
     'helpIntro': 'راهنمای صفحه ساب و قالب آن', 'helpPromptHint': 'این Prompt منطق صفحه ساب فعلی را توضیح می‌دهد تا بتوانید آن را به هوش مصنوعی بدهید.',
     'helpServerEditHint': 'آدرس اتصال کانفیگ‌های پیش‌فرض TLS + WS را تغییر دهید. Host و SNI دامنه پنل باقی می‌مانند.', 'helpChatgptAddress': 'قرار دادن chatgpt.com در Address', 'helpCustomAddress': 'ذخیره آدرس سفارشی', 'helpAddressLabel': 'آدرس سفارشی', 'helpAddressPlaceholder': 'دامنه یا IP (IPv4/IPv6)', 'helpPanelIpv6': 'استفاده از IPv6 دامنه پنل', 'helpResetAddress': 'استفاده از دامنه پنل',
     'helpAddressSaved': 'آدرس کانفیگ ذخیره شد', 'helpAddressInvalid': 'دامنه یا IP معتبر وارد کنید', 'helpIpv6NotFound': 'برای دامنه پنل IPv6 پیدا نشد', 'helpSettingsSaved': 'تنظیمات ذخیره شد',
+    'helpEchChoose': 'انتخاب ECH', 'helpEchPickerTitle': 'ECH List', 'helpEchPickerHint': 'یک مقدار را انتخاب کنید؛ با فعال کردن ECH همین مقدار در کانفیگ‌ها استفاده می‌شود.', 'helpEchPresetSaved': 'گزینه ECH ذخیره شد',
     'helpFeatureHint': 'این گزینه‌ها فقط به کانفیگ‌های اینباند پیش‌فرض TLS + WS افزوده می‌شوند.', 'helpEch': 'افزودن ECH', 'helpEchHint': 'پارامتر ECH را به کانفیگ‌های TLS + WS پیش‌فرض اضافه می‌کند.', 'helpFf': 'افزودن F+F', 'helpFfHint': 'مجموعه cipher و تنظیمات fragment نمونه را به کانفیگ‌های TLS + WS پیش‌فرض اضافه می‌کند و هنگام فعال بودن، fingerprint را روی unsafe می‌گذارد.',
     'helpSpoof': 'Spoof', 'helpSpoofHint': 'پارامتر snispoofing را به کانفیگ‌های TLS + WS پیش‌فرض اضافه می‌کند.', 'helpSpoofSni': 'SNI جعلی', 'helpSpoofIp': 'IP مقصد', 'helpSpoofMissing': 'برای فعال کردن Spoof، SNI و IP را وارد کنید', 'helpSpoofSaved': 'تنظیمات Spoof ذخیره شد',
     'advancedInboundHint': 'یک اینباند را انتخاب کنید و JSON کامل آن را ویرایش کنید. تغییرات ذخیره و برای سرویس اعمال می‌شوند.', 'advancedSelectInbound': 'انتخاب اینباند', 'advancedChooseInbound': 'انتخاب کنید', 'advancedJson': 'JSON اینباند', 'advancedSave': 'ذخیره JSON', 'advancedSaved': 'JSON اینباند ذخیره شد', 'advancedInvalidJson': 'JSON معتبر نیست', 'advancedNoInbounds': 'اینباند قابل ویرایشی وجود ندارد', 'defaultTlsWsInbound': 'پیش‌فرض TLS + WS',
@@ -2596,6 +2978,7 @@ var I18N = {
     'helpIntro': 'Subscription page help and template', 'helpPromptHint': 'This prompt documents the current subscription page so you can give it to an AI.',
     'helpServerEditHint': 'Change the connect address in default TLS + WS configs. Host and SNI remain the panel domain.', 'helpChatgptAddress': 'Set Address to chatgpt.com', 'helpCustomAddress': 'Save custom address', 'helpAddressLabel': 'Custom Address', 'helpAddressPlaceholder': 'Domain or IP (IPv4/IPv6)', 'helpPanelIpv6': 'Use the panel domain IPv6', 'helpResetAddress': 'Use the panel domain',
     'helpAddressSaved': 'Config address saved', 'helpAddressInvalid': 'Enter a valid domain or IP address', 'helpIpv6NotFound': 'No IPv6 address was found for the panel domain', 'helpSettingsSaved': 'Settings saved',
+    'helpEchChoose': 'Choose ECH', 'helpEchPickerTitle': 'ECH List', 'helpEchPickerHint': 'Choose a value; enabling ECH will use this value in generated configs.', 'helpEchPresetSaved': 'ECH preset saved',
     'helpFeatureHint': 'These options are added only to configs from the default TLS + WS inbound.', 'helpEch': 'Add ECH', 'helpEchHint': 'Adds the ECH parameter to default TLS + WS configs.', 'helpFf': 'Add F+F', 'helpFfHint': 'Adds the sample cipher suite and fragmentation parameters to default TLS + WS configs, and sets the fingerprint to unsafe while it is on.',
     'helpSpoof': 'Spoof', 'helpSpoofHint': 'Adds the snispoofing parameter to default TLS + WS configs.', 'helpSpoofSni': 'Fake SNI', 'helpSpoofIp': 'Target IP', 'helpSpoofMissing': 'Enter the SNI and IP to enable Spoof', 'helpSpoofSaved': 'Spoof settings saved',
     'advancedInboundHint': 'Select an inbound and edit its full JSON. Changes are saved and applied to the service.', 'advancedSelectInbound': 'Select inbound', 'advancedChooseInbound': 'Choose an inbound', 'advancedJson': 'Inbound JSON', 'advancedSave': 'Save JSON', 'advancedSaved': 'Inbound JSON saved', 'advancedInvalidJson': 'Invalid JSON', 'advancedNoInbounds': 'No editable inbounds', 'defaultTlsWsInbound': 'Default TLS + WS',
@@ -2693,7 +3076,54 @@ Object.assign(I18N.fa, {
   'notCreated': 'ساخته نشده',
   'helpLogs': 'لاگ پنل', 'helpLogsHint': 'لاگ کامل پنل: اتصال کاربران، ورود و خروج، ساخت/ویرایش/حذف رکوردها و همه خطاها. با فیلتر و جست‌وجو مرور کنید.',
   'helpLogsSearch': 'جست‌وجو در لاگ…', 'helpLogsAll': 'همه دسته‌ها', 'helpLogsAllLevels': 'همه سطح‌ها', 'helpLogsAuto': 'زنده', 'helpLogsEmpty': 'در حال بارگذاری…',
-  'helpLogsTotal': 'کل', 'helpLogsConn': 'اتصال', 'helpLogsAuth': 'ورود/خروج', 'helpLogsErr': 'خطا', 'helpLogsNone': 'هیچ لاگی با این فیلتر پیدا نشد.'
+  'helpLogsTotal': 'کل', 'helpLogsConn': 'اتصال', 'helpLogsAuth': 'ورود/خروج', 'helpLogsErr': 'خطا', 'helpLogsNone': 'هیچ لاگی با این فیلتر پیدا نشد.',
+  // Tunnel Management (TM)
+  'tm.nav': 'مدیریت تونل (TM)', 'tm.short': 'TM', 'tm.title': 'مدیریت تونل', 'tm.server': 'سرورها', 'tm.configure': 'پیکربندی',
+  'tm.servers': 'سرورها', 'tm.links': 'اتصال‌ها', 'tm.entry': 'ورودی', 'tm.exit': 'خروجی', 'tm.lastApply': 'آخرین اعمال',
+  'tm.addServer': 'افزودن سرور', 'tm.serverHint': 'هر سرور یک Node واقعی همین پنل است. کلید API فقط روی سرور ذخیره می‌شود و هرگز به مرورگر فرستاده نمی‌شود.',
+  'tm.editServer': 'ویرایش سرور', 'tm.delServer': 'حذف سرور', 'tm.pingServer': 'تست سلامت', 'tm.pingFromBackend': 'از بک‌اند پنل',
+  'tm.noServers': 'هنوز سروری اضافه نشده است — «افزودن سرور» را بزنید.',
+  'tm.loadErr': 'دریافت اطلاعات تونل ممکن نشد',
+  'tm.addServerTitle': 'افزودن سرور TM', 'tm.editServerTitle': 'ویرایش سرور', 'tm.serverName': 'نام نمایشی', 'tm.serverNamePlaceholder': 'مثلاً آلمان ۱',
+  'tm.serverDomain': 'دامنه پنل سرور', 'tm.serverDomainPlaceholder': 'vpn.example.com یا https://vpn.example.com',
+  'tm.spiKey': 'API Key سرور', 'tm.spiKeyPlaceholder': 'spdr_••••••••',
+  'tm.keyHint': 'در حالت ویرایش، کلید را خالی بگذارید تا کلید قبلی حفظ شود.',
+  'tm.keyNeverShown': 'کلید ذخیره‌شده نمایش داده نمی‌شود: {{masked}}',
+  'tm.confirmDelServer': 'این سرور حذف شود؟ اتصال‌های گراف آن هم پاک می‌شوند.',
+  'tm.serverAdded': 'سرور اضافه شد', 'tm.serverSaved': 'سرور ذخیره شد', 'tm.serverDeleted': 'سرور حذف شد', 'tm.serverSavedOffline': 'ذخیره شد، اما سرور در دسترس نیست',
+  'tm.remoteOffline': 'سرور ریموت در دسترس نیست',
+  'tm.apply': 'اعمال تونل', 'tm.validate': 'اعتبارسنجی', 'tm.chainPing': 'پینگ زنجیره', 'tm.clientPingAll': 'پینگ کلاینت',
+  'tm.curved': 'منحنی', 'tm.straight': 'مستقیم', 'tm.connect': 'اتصال جدید', 'tm.disconnect': 'قطع',
+  'tm.configureHint': 'حرکت نود: نگه داشتن طولانی · باز کردن کنترل‌ها: ضربه کوتاه · «اتصال جدید»: دو سرور را به هم وصل می‌کند.',
+  'tm.selectSource': 'سرور مبدأ', 'tm.selectDest': 'سرور مقصد',
+  'tm.hlConnect': 'حالت اتصال: مبدأ «{{src}}» — مقصد را انتخاب کنید',
+  'tm.duplicate': 'این اتصال از قبل وجود دارد', 'tm.selfLoop': 'سرور نمی‌تواند به خودش وصل شود',
+  'tm.edgeDeleted': 'اتصال حذف شد', 'tm.edgeAdded': 'اتصال ساخته شد', 'tm.styleChanged': 'نوع خط عوض شد',
+  'tm.validateOk': 'توپولوژی معتبر است', 'tm.applyDone': 'تونل اعمال شد', 'tm.applyFailed': 'اعمال ناموفق بود',
+  'tm.setDone': 'سرور فعال شد — کانفیگ تولیدی از همین سرور عبور می‌کند', 'tm.setClear': 'حذف انتخاب سرور فعال',
+  'tm.chainPingResult': 'تأخیر زنجیره (سرور به سرور)', 'tm.clientPingResult': 'تأخیر از این دستگاه',
+  'tm.offline': 'قطع / Timeout', 'tm.measuring': 'در حال اندازه‌گیری…', 'tm.samples': 'نمونه',
+  'tm.noChain': 'زنجیره فعالی وجود ندارد', 'tm.noGraph': 'گراف خالی است', 'tm.pinging': 'در حال پینگ…',
+  'tm.generated': 'مسیر کانفیگ تولیدی', 'tm.generatedHint': 'این دقیقاً همان چیزی است که کاربر متصل به اینباند TM دریافت می‌کند. «انتخاب سرور» تعیین می‌کند کلاینت به کدام سرور وصل شود.',
+  'tm.regenerate': 'بازتولید', 'tm.copy': 'کپی',
+  'tm.state.idle': 'غیرفعال', 'tm.state.active': 'فعال', 'tm.state.dirty': 'تغییر اعمال‌نشده', 'tm.state.applied': 'اعمال‌شده',
+  'tm.role.initial': 'ورودی', 'tm.role.middle': 'میانی', 'tm.role.final': 'خروجی', 'tm.role.initial_final': 'ورودی + خروجی',
+  'tm.role.idle': 'غیرفعال',
+  'tm.clientPingCardHint': 'اندازه‌گیری واقعی از همین دستگاه/شبکه شما با چند نمونه؛ در صورت شکست همیشه «قطع / Timeout» نمایش داده می‌شود.',
+  'tm.serverPingCardHint': 'سلامت سرور به سرور از بک‌اند پنل؛ هرگز جایگزین تأخیر کلاینت نمی‌شود.',
+  'step.validated': 'گراف تأیید شد', 'step.chain': 'زنجیره مشخص شد', 'step.server': 'سرور', 'step.inbound': 'اینباند TM به‌روزرسانی شد',
+  'step.users': 'کاربران همگام شدند', 'step.applied': 'پیکربندی TM اعمال شد', 'step.rollback': 'بازگشت به توپولوژی قبلی انجام شد',
+  'tm.clientPing': 'پینگ کلاینت', 'tm.serverPing': 'پینگ سرور به سرور',
+  'tm.fromThisDevice': 'از همین دستگاه', 'tm.fromBackend': 'از بک‌اند',
+  'tm.clientPingEmpty': 'هنوز اندازه‌گیری نشده', 'tm.serverPingEmpty': 'هنوز اندازه‌گیری نشده',
+  'tm.cycle': 'حلقه در مسیر ایجاد می‌شود', 'tm.destChanged': 'مقصد اتصال عوض شد',
+  'tm.errorApiKey': 'کلید API الزامی است', 'tm.fillDomain': 'دامنه سرور الزامی است', 'tm.selectEdgeFirst': 'ابتدا یک خط اتصال را انتخاب کنید',
+  'tm.keyFrom': 'این سرور مبدأ شود', 'tm.keyTo': 'این سرور مقصد شود',
+  'tm.hlFrom': 'مبدأ «{{src}}» — کلید روی باکس مقصد را بزنید', 'tm.hlTo': 'مقصد «{{dst}}» — کلید پشت باکس مبدأ را بزنید',
+  'tm.invalid': 'توپولوژی نامعتبر است',
+  'tm.applying': 'در حال اعمال روی سرورها…', 'tm.balancer': 'بالانسر',
+  'tm.balancerHint': 'چند سرور موازی به یک مقصد: اگر یکی از کار بیفتد، به‌طور خودکار سراغ سرور بعدی می‌رود.',
+  'tm.auto': 'خودکار', 'tm.autoDone': 'اعمال شد', 'tm.roleLabel': 'نقش'
 });
 Object.assign(I18N.en, {
   loginSubtitle: 'High performance admin panel', loginUsernameLabel: 'Username', loginPasswordLabel: 'Password', loginUsernamePlaceholder: 'Enter username', loginPasswordPlaceholder: 'Enter password', signIn: 'Sign In',
@@ -2730,7 +3160,55 @@ Object.assign(I18N.en, {
   'notCreated': 'Not created',
   'helpLogs': 'Panel Logs', 'helpLogsHint': 'Full panel log: user connections, logins and logouts, create/edit/delete events and every error. Filter and search through them.',
   'helpLogsSearch': 'Search the log…', 'helpLogsAll': 'All kinds', 'helpLogsAllLevels': 'All levels', 'helpLogsAuto': 'Live', 'helpLogsEmpty': 'Loading…',
-  'helpLogsTotal': 'Total', 'helpLogsConn': 'Connections', 'helpLogsAuth': 'Auth', 'helpLogsErr': 'Errors', 'helpLogsNone': 'No log entries match this filter.'
+  'helpLogsTotal': 'Total', 'helpLogsConn': 'Connections', 'helpLogsAuth': 'Auth', 'helpLogsErr': 'Errors', 'helpLogsNone': 'No log entries match this filter.',
+  // Tunnel Management (TM)
+  'tm.nav': 'Tunnel Management (TM)', 'tm.short': 'TM', 'tm.title': 'Tunnel Management', 'tm.server': 'Server', 'tm.configure': 'Configure',
+  'tm.servers': 'Servers', 'tm.links': 'Links', 'tm.entry': 'Entry', 'tm.exit': 'Exit', 'tm.lastApply': 'Last Apply',
+  'tm.addServer': 'Add Server', 'tm.serverHint': 'Every server is a real Node of this panel. The API key is stored server-side only and is never sent to the browser.',
+  'tm.editServer': 'Edit server', 'tm.delServer': 'Delete server', 'tm.pingServer': 'Test health', 'tm.pingFromBackend': 'from the panel backend',
+  'tm.noServers': 'No server yet — press «Add Server».',
+  'tm.loadErr': 'Could not load the tunnel information',
+  'tm.addServerTitle': 'Add TM server', 'tm.editServerTitle': 'Edit server', 'tm.serverName': 'Display name', 'tm.serverNamePlaceholder': 'e.g. Germany 1',
+  'tm.serverDomain': 'Server panel domain', 'tm.serverDomainPlaceholder': 'vpn.example.com or https://vpn.example.com',
+  'tm.spiKey': 'API key (server)', 'tm.spiKeyPlaceholder': 'spdr_••••••••',
+  'tm.keyHint': 'When editing, leave the key empty to keep the stored one.',
+  'tm.keyNeverShown': 'The stored key is never displayed: {{masked}}',
+  'tm.confirmDelServer': 'Delete this server? Its graph connections are removed too.',
+  'tm.serverAdded': 'Server added', 'tm.serverSaved': 'Server saved', 'tm.serverDeleted': 'Server deleted', 'tm.serverSavedOffline': 'Saved, but the server is unreachable',
+  'tm.remoteOffline': 'The remote server is unreachable',
+  'tm.apply': 'Apply TM', 'tm.validate': 'Validate', 'tm.chainPing': 'Chain Ping', 'tm.clientPingAll': 'Client Ping',
+  'tm.curved': 'Curved', 'tm.straight': 'Straight', 'tm.connect': 'Connect', 'tm.disconnect': 'Disconnect',
+  'tm.configureHint': 'Move a node with a long press · tap it to open its controls · «Connect» links two servers.',
+  'tm.selectSource': 'Source server', 'tm.selectDest': 'Destination server',
+  'tm.hlConnect': 'Connect mode: source «{{src}}» — pick the destination',
+  'tm.duplicate': 'This connection already exists', 'tm.selfLoop': 'A server cannot connect to itself',
+  'tm.edgeDeleted': 'Connection removed', 'tm.edgeAdded': 'Connection created', 'tm.styleChanged': 'Line style changed',
+  'tm.validateOk': 'The topology is valid', 'tm.applyDone': 'Tunnel applied', 'tm.applyFailed': 'Apply failed',
+  'tm.setDone': 'Active server set — the generated config dials this server', 'tm.setClear': 'Active server cleared',
+  'tm.chainPingResult': 'Chain latency (server to server)', 'tm.clientPingResult': 'Latency from this device',
+  'tm.offline': 'Offline / Timeout', 'tm.measuring': 'Measuring…', 'tm.samples': 'samples',
+  'tm.noChain': 'There is no active chain', 'tm.noGraph': 'The graph is empty', 'tm.pinging': 'Pinging…',
+  'tm.generated': 'Generated client route', 'tm.generatedHint': 'This is exactly what a user assigned to the TM inbound receives. Set decides which server the client dials.',
+  'tm.regenerate': 'Regenerate', 'tm.copy': 'Copy',
+  'tm.state.idle': 'Inactive', 'tm.state.active': 'Active', 'tm.state.dirty': 'Unapplied changes', 'tm.state.applied': 'Applied',
+  'tm.role.initial': 'Initial', 'tm.role.middle': 'Middle', 'tm.role.final': 'Final', 'tm.role.initial_final': 'Initial + Final',
+  'tm.role.idle': 'Idle',
+  'tm.clientPingCardHint': 'A real measurement from this device/network with several samples; a failure always shows «Offline / Timeout».',
+  'tm.serverPingCardHint': 'Server-to-server health from the panel backend; it never replaces the client-side latency.',
+  'step.validated': 'Graph validated', 'step.chain': 'Chain resolved', 'step.server': 'Server', 'step.inbound': 'TM inbound updated',
+  'step.users': 'Users synced', 'step.applied': 'TM configuration applied', 'step.rollback': 'Rolled back to the previous topology',
+  'tm.keyFrom': 'Make this server the source', 'tm.keyTo': 'Make this server the destination',
+  'tm.hlFrom': 'Source «{{src}}» — tap the key on the destination box', 'tm.hlTo': 'Destination «{{dst}}» — tap the key behind the source box',
+  'tm.invalid': 'The topology is not valid',
+  'tm.applying': 'Applying to the servers…', 'tm.balancer': 'Balancer',
+  'tm.auto': 'Auto', 'tm.autoDone': 'Applied', 'tm.roleLabel': 'Role',
+  'tm.balancerHint': 'Several parallel servers share one destination: if one goes down, the traffic automatically moves to the next one.',
+  'tm.clientPing': 'Client Ping', 'tm.serverPing': 'Server-to-server Ping',
+  'tm.fromThisDevice': 'from this device', 'tm.fromBackend': 'from the backend',
+  'tm.clientPingEmpty': 'Not measured yet', 'tm.serverPingEmpty': 'Not measured yet',
+  'tm.cycle': 'That would create a loop', 'tm.destChanged': 'Connection destination changed',
+  'tm.errorApiKey': 'The API key is required', 'tm.fillDomain': 'The server domain is required',
+  'tm.selectEdgeFirst': 'Select a connection line first'
 });
 
 // ── Built-in `Web Proxy` inbound (telegram-webproxy) ───────────────────────
@@ -3003,7 +3481,7 @@ function switchTab(tab, el) {
   target.style.setProperty('margin-top', '0px', 'important');
   target.style.setProperty('top', '0px', 'important');
   target.style.setProperty('transform', 'none', 'important');
-  if (tab === 'worker' || tab === 'contact' || tab === 'settings' || tab === 'nodes' || tab === 'advanced' || tab === 'help' || tab === 'notif' || tab === 'proxy' || tab === 'suggest') {
+  if (tab === 'worker' || tab === 'contact' || tab === 'settings' || tab === 'nodes' || tab === 'advanced' || tab === 'help' || tab === 'notif' || tab === 'proxy' || tab === 'suggest' || tab === 'tm') {
     target.style.setProperty('position', 'static', 'important');
     target.style.setProperty('flex', 'none', 'important');
   }
@@ -3052,6 +3530,7 @@ var TAB_LOADERS = {
   worker: function () { return loadWorker(); },
   tunnel: function () { return loadTunnel(); },
   nodes: function () { return loadNodes(); },
+  tm: function () { return loadTM(); },
   bot: function () { return loadBot(); },
   proxy: function () { return loadProxies(); },
   advanced: function () {
@@ -4248,10 +4727,52 @@ function _setHelpSwitch(id, enabled) {
   el.setAttribute('aria-checked', String(!!enabled));
 }
 
+var ECH_PRESET_LABELS = {
+  'cf-config': 'CF Config',
+  'crypto-cloudflare': 'CF DNS',
+  'ridanbe': 'Ridanbe',
+  'iranva': 'Iranva'
+};
+var SELECTED_ECH_PRESET = 'cf-config';
+
+function setEchPresetUi(preset) {
+  preset = ECH_PRESET_LABELS[preset] ? preset : 'cf-config';
+  SELECTED_ECH_PRESET = preset;
+  var label = $id('help-ech-preset-label');
+  if (label) label.textContent = ECH_PRESET_LABELS[preset];
+  Array.prototype.forEach.call(document.querySelectorAll('[data-ech-preset]'), function(option) {
+    var selected = option.getAttribute('data-ech-preset') === preset;
+    option.classList.toggle('selected', selected);
+    option.setAttribute('aria-pressed', String(selected));
+  });
+}
+
+function openEchPresetPicker() {
+  setEchPresetUi(SELECTED_ECH_PRESET);
+  openModal('mod-ech-picker');
+}
+
+async function selectEchPreset(preset) {
+  if (!ECH_PRESET_LABELS[preset]) return;
+  var options = document.querySelectorAll('[data-ech-preset]');
+  Array.prototype.forEach.call(options, function(option) { option.disabled = true; });
+  try {
+    var s = await api('/api/help/settings', {method: 'POST', body: {ech_preset: preset}});
+    setEchPresetUi(s.ech_preset || preset);
+    closeModal('mod-ech-picker');
+    toast(t('helpEchPresetSaved'), 'ok');
+  } catch(e) {
+    toast(e.message || t('toast.err'), 'err');
+  } finally {
+    Array.prototype.forEach.call(options, function(option) { option.disabled = false; });
+  }
+}
+
 async function loadHelpSettings() {
   try {
     var s = await api('/api/help/settings');
     if ($id('help-custom-address')) $id('help-custom-address').value = s.address_override || '';
+    setEchPresetUi(s.ech_preset || 'cf-config');
     _setHelpSwitch('help-ech-switch', s.ech_enabled);
     _setHelpSwitch('help-ff-switch', s.ff_enabled);
     _setHelpSwitch('help-spoof-switch', s.spoof_enabled);
@@ -6232,7 +6753,7 @@ function openNodeModal(nodeId) {
     var fields = [
       {id:'node-name', label:'Name', type:'text', placeholder:'Germany'},
       {id:'node-domain', label:'Domain', type:'text', placeholder:'example.com'},
-      {id:'node-apikey', label:'SPI Key', type:'password', placeholder:'spdr_xxxxxxxxx'}
+      {id:'node-apikey', label:'API Key', type:'password', placeholder:'spdr_xxxxxxxxx'}
     ];
     fields.forEach(function(f){
       var g = document.createElement('div'); g.className='f-g';
@@ -6243,7 +6764,7 @@ function openNodeModal(nodeId) {
     });
     var hint = document.createElement('div');
     hint.className='px-hint';
-    hint.textContent='در حالت ویرایش، SPI Key را خالی بگذارید تا همان کلید قبلی حفظ شود.';
+    hint.textContent='در حالت ویرایش، API Key را خالی بگذارید تا همان کلید قبلی حفظ شود.';
     form.appendChild(hint);
     var btns=document.createElement('div'); btns.className='modal-btns';
     var bc=document.createElement('button'); bc.type='button'; bc.className='btn btn-g'; bc.textContent=t('cancel'); bc.onclick=function(){ closeModal('mod-node'); };
@@ -6265,7 +6786,7 @@ async function submitNode(e) {
   var name=$id('node-name').value.trim();
   var domain=$id('node-domain').value.trim();
   var apiKey=$id('node-apikey').value.trim();
-  if(!domain || (!EDITING_NODE_ID && !apiKey)){ toast('Domain و SPI Key الزامی است','err'); return; }
+  if(!domain || (!EDITING_NODE_ID && !apiKey)){ toast('Domain و API Key الزامی است','err'); return; }
   var btn=e.target.querySelector('button[type="submit"]'); if(btn){btn.disabled=true;btn.textContent='...';}
   try{
     var method=EDITING_NODE_ID?'PATCH':'POST';
@@ -6445,8 +6966,1553 @@ async function generateApiKey() {
   } catch(e) { toast(e.message || 'خطا', 'err'); }
 }
 
-// Start neon bars when tab opens
-setTimeout(updateNeonBars, 500);
+// ─── TUNNEL MANAGEMENT (TM) ──────────────────────────────────────────────────
+// Everything below talks to /api/tm/* over the panel's normal session cookie.
+// No API key ever reaches this file: the backend keeps it server-side and only
+// returns masked metadata, so there is nothing secret to leak from here.
+//
+// Two latency numbers live side by side and are never mixed:
+//   * `pings[id].clientMs`  – measured BY THIS BROWSER against the server's own
+//                             reachable endpoint (several samples, median).
+//   * `srv.server_latency_ms` – measured BY THE PANEL BACKEND (health probe).
+// A client measurement is never replaced by a backend one, and a failure is
+// always reported as "Offline / Timeout" instead of a guessed number.
+
+var TM = {
+  servers: [],
+  edges: [],
+  activeServer: '',
+  status: null,
+  appliedEdges: [],
+  appliedChain: [],
+  pings: {},          // node_id -> {clientMs: number|null, testing: bool, at: number}
+  chainPing: null,
+  edgePings: {},      // edge id -> ms, measured server-to-server by the backend
+  edgePingAt: {},     // edge id -> when it was measured (the chip hides after a while)
+  edgePingBusy: '',
+  chipTimer: null,    // auto-hide a ping result some time after it arrived
+  progressTimer: null,
+  nodeTimer: null,    // auto-collapse the expanded node popover
+  bar: null,          // a bar being dragged: {edgeId, pointerId, mode, …}
+  snapHl: '',         // node currently lit up as the magnet target
+  section: 'server',
+  zoom: 1,
+  panX: 0,
+  panY: 0,
+  pendingSrc: '',     // a box picked as the source (its key behind the box)
+  pendingDst: '',     // a box picked as the destination (its key on the face)
+  selectedEdge: '',
+  openNode: '',       // node whose popover is expanded
+  sizes: {},          // node_id -> {w, h} measured after render
+  drag: null,
+  pan: null,
+  press: null,        // pending long-press before a node drag starts
+  pointers: {},       // pointerId -> {x, y} for pinch zoom
+  pinch: null,
+  saveTimer: null,
+  edgeFrame: null,
+  defaultEdgeStyle: 'curved'
+};
+
+function $t(id) { return document.getElementById(id); }
+
+function tmSleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function tmServerById(id) { return TM.servers.filter(function (s) { return s.node_id === id; })[0] || null; }
+function tmEdgeById(id) { return TM.edges.filter(function (e) { return e.id === id; })[0] || null; }
+function tmEdgeFor(from, to) {
+  return TM.edges.filter(function (e) { return e.from === from && e.to === to; })[0] || null;
+}
+function tmNodeName(id) { var s = tmServerById(id); return s ? (s.country_flag + ' ' + s.name) : id; }
+
+// The role of a node is always DERIVED from the graph, never stored per node.
+function tmRoleOf(nodeId) {
+  var roles = (TM.status && TM.status.roles) || {};
+  var role = roles[nodeId];
+  if (role) return role;
+  var chain = TM.appliedChain || [];
+  var idx = chain.indexOf(nodeId);
+  if (idx < 0) return null;
+  var label = chain.length === 1 ? t('tm.role.initial_final')
+    : idx === 0 ? t('tm.role.initial')
+    : idx === chain.length - 1 ? t('tm.role.final')
+    : t('tm.role.middle');
+  return { node_id: nodeId, role_label: label, active: true };
+}
+function tmRoleLabel(nodeId) {
+  var r = tmRoleOf(nodeId);
+  if (!r) return '';
+  // The backend's role_label is English; the UI's own key follows the locale.
+  var label = t('tm.role.' + (r.role || 'idle')) || r.role_label || '';
+  // A fan-out hop is both a role position and the balancer for what follows.
+  if (r.balancer) label += (label ? ' · ' : '') + t('tm.balancer');
+  return label;
+}
+
+// ─── Data load ──────────────────────────────────────────────────────────────
+async function loadTM() {
+  try {
+    var data = await api('/api/tm');
+    TM.servers = (data.graph && data.graph.servers) || [];
+    TM.edges = (data.graph && data.graph.edges) || [];
+    TM.activeServer = (data.graph && data.graph.active_server) || '';
+    TM.status = data.status || null;
+    TM.appliedEdges = ((data.status && data.status.applied_edges) || []);
+    TM.appliedChain = ((data.status && data.status.applied_chain) || []);
+    tmDropMissingRefs();
+    tmRenderServers();
+    tmRenderStatus();
+    tmRenderGraph();
+  } catch (e) {
+    var el = $t('tm-server-list');
+    if (el) el.innerHTML = '<div style="color:var(--red);padding:16px">' + esc(e.message || t('tm.loadErr')) + '</div>';
+  }
+}
+
+// A deleted server must not survive anywhere in the rendered graph.
+function tmDropMissingRefs() {
+  var known = {};
+  TM.servers.forEach(function (s) { known[s.node_id] = true; });
+  TM.edges = TM.edges.filter(function (e) { return known[e.from] && known[e.to]; });
+  if (TM.activeServer && !known[TM.activeServer]) TM.activeServer = '';
+  if (TM.pendingSrc && !known[TM.pendingSrc]) TM.pendingSrc = '';
+  if (TM.pendingDst && !known[TM.pendingDst]) TM.pendingDst = '';
+  TM.servers.forEach(function (s) {
+    if (s.x == null || s.y == null || (s.x === 0 && s.y === 0)) tmPlaceServer(s);
+  });
+}
+
+// Deterministic first-placement for a server that has never been dragged.
+function tmPlaceServer(srv) {
+  var index = TM.servers.indexOf(srv);
+  var cols = Math.max(1, Math.min(4, TM.servers.length));
+  srv.x = 40 + (index % cols) * 240;
+  srv.y = 30 + Math.floor(index / cols) * 150;
+  tmPersistPositionsSoon();
+}
+
+async function tmPersistPositionsSoon() {
+  clearTimeout(TM.saveTimer);
+  TM.saveTimer = setTimeout(function () {
+    var positions = {};
+    TM.servers.forEach(function (s) { positions[s.node_id] = { x: Math.round(s.x || 0), y: Math.round(s.y || 0) }; });
+    api('/api/tm/graph', { method: 'PUT', body: { positions: positions } }).catch(function () {});
+  }, 700);
+}
+
+async function tmSaveGraph(extra) {
+  var body = { positions: {}, edges: TM.edges };
+  TM.servers.forEach(function (s) { body.positions[s.node_id] = { x: Math.round(s.x || 0), y: Math.round(s.y || 0) }; });
+  if (extra && extra.active_server !== undefined) body.active_server = extra.active_server;
+  try {
+    var r = await api('/api/tm/graph', { method: 'PUT', body: body });
+    if (r && r.status) { TM.status = r.status; tmRenderStatus(); }
+    return r;
+  } catch (e) { toast(e.message || t('toast.err'), 'err'); return null; }
+}
+
+// ─── Sections ───────────────────────────────────────────────────────────────
+function tmSetSection(section) {
+  TM.section = section;
+  ['server', 'configure'].forEach(function (key) {
+    var btn = document.querySelector('[data-tm-section="' + key + '"]');
+    if (btn) { btn.classList.toggle('active', key === section); btn.setAttribute('aria-selected', String(key === section)); }
+    var pane = $t('tm-section-' + key);
+    if (pane) pane.classList.toggle('hidden', key !== section);
+  });
+  if (section === 'configure') {
+    // The canvas has no layout while hidden, so render after it is on screen.
+    requestAnimationFrame(function () {
+      tmRenderGraph();
+      tmFit();
+      tmPingAllMissing();     // one pass, on demand only — never a polling loop
+      tmGenerate();
+    });
+  }
+}
+
+function tmRenderStatus() {
+  var st = TM.status || {};
+  var stateEl = $t('tm-sb-state');
+  if (stateEl) {
+    var label = !TM.edges.length ? t('tm.state.idle')
+      : (st.active ? (st.dirty ? t('tm.state.dirty') : t('tm.state.active')) : t('tm.state.idle'));
+    stateEl.textContent = label;
+    stateEl.className = 'tm-sb-state ' + (st.active && !st.dirty ? 'ok' : st.last_error ? 'err' : 'idle');
+  }
+  var put = function (id, val) { var e = $t(id); if (e) e.textContent = val; };
+  put('tm-sb-servers', String(TM.servers.length));
+  put('tm-sb-links', String(TM.edges.length));
+  put('tm-sb-entry', st.entry || '—');
+  put('tm-sb-exit', st.exit || '—');
+  put('tm-sb-apply', st.last_apply ? new Date(st.last_apply).toLocaleString() : '—');
+  // The balancer badge only appears when a hop really does fan out.
+  var balItem = $t('tm-sb-bal');
+  if (balItem) {
+    balItem.classList.toggle('hidden', !st.balancer);
+    put('tm-sb-chain', (st.levels || []).map(function (n) { return n.length; }).join('×'));
+  }
+}
+
+// ─── TM → Server ────────────────────────────────────────────────────────────
+function tmRenderServers() {
+  var wrap = $t('tm-server-list');
+  if (!wrap) return;
+  if (!TM.servers.length) {
+    wrap.innerHTML = '<div class="empty" style="padding:18px;text-align:center">' + esc(t('tm.noServers')) + '</div>';
+    return;
+  }
+  var html = '';
+  TM.servers.forEach(function (srv) {
+    var online = srv.status === 'online';
+    var checking = srv.status === 'checking' || srv.status === 'unauthorized';
+    var stCls = online ? 'node-online' : checking ? 'node-checking' : 'node-offline';
+    var stText = online ? t('connected') : checking ? t('connecting') : t('disconnected');
+    var roleLabel = tmRoleLabel(srv.node_id);
+    var isSet = TM.activeServer === srv.node_id;
+    var accId = 'tm-srv-' + srv.node_id;
+    var inGraph = TM.edges.some(function (e) { return e.from === srv.node_id || e.to === srv.node_id; });
+    var clientPing = tmClientPingText(srv.node_id);
+    var clientOff = tmClientPingDown(srv.node_id);
+    html += '<div class="spd-acc tm-server-acc">' +
+      '<button type="button" class="spd-acc-head" onclick="tmToggleServerAcc(this)" aria-expanded="false" aria-controls="acc-' + escAttr(accId) + '">' +
+        '<span class="spd-acc-title"><strong>' + esc(srv.country_flag + ' ' + srv.name) + (isSet ? ' ★' : '') + '</strong>' +
+          '<span style="font-size:10px;color:var(--txt2);display:block;margin-top:3px" dir="ltr">' + esc(srv.domain || '—') + '</span>' +
+          (roleLabel ? '<span class="tm-server-head-role">' + esc(roleLabel) + '</span>' : '') +
+        '</span>' +
+        // The client ping lives right here in the header — measured from this
+        // device — while the backend's own health number stays in the body.
+        '<span class="tm-srv-ping" dir="ltr" id="tm-srv-cping-' + escAttr(srv.node_id) + '">' + esc(clientPing) + '</span>' +
+        '<span class="node-status-pill ' + stCls + '">' + esc(stText) + '</span>' +
+        '<span class="material-symbols-outlined spd-acc-arrow">expand_more</span>' +
+      '</button>' +
+      '<div class="spd-acc-body" id="acc-' + escAttr(accId) + '" aria-hidden="true">' +
+        '<div class="set-row"><span class="set-lbl">' + esc(t('nodeDomain')) + '</span><span dir="ltr" style="font-size:12px">' + esc(srv.domain || '—') + '</span></div>' +
+        '<div class="set-row"><span class="set-lbl">' + esc(t('nodeStatusLabel')) + '</span><span class="node-status-pill ' + stCls + '">' + esc(stText) + '</span></div>' +
+        // The accordion's ping IS the client ping — the same number this
+        // browser measured, shown in the header and on the graph box. The
+        // server-to-server number lives on the connection bars, where it
+        // describes a link rather than the viewer's own route.
+        '<div class="set-row"><span class="set-lbl">' + esc(t('tm.clientPing')) + ' <span class="tm-lat-tag tm-lat-tag-client">' + esc(t('tm.fromThisDevice')) + '</span></span>' +
+          '<span class="tm-srv-ping' + (clientOff ? ' off' : '') + '" dir="ltr" id="tm-srv-cping-body-' + escAttr(srv.node_id) + '">' + esc(clientPing) + '</span></div>' +
+        '<div class="set-row"><span class="set-lbl">API Key</span><span dir="ltr" style="font-size:11px;font-family:monospace">' + esc(srv.api_key_masked || '—') + '</span></div>' +
+        (roleLabel ? '<div class="set-row"><span class="set-lbl">' + esc(t('tm.roleLabel')) + '</span><b>' + esc(roleLabel) + '</b></div>' : '') +
+        '<div class="set-row"><span class="set-lbl">TM</span><b>' + esc(inGraph ? (roleLabel || '—') : t('tm.role.idle')) + '</b></div>' +
+        (isSet ? '<div class="tm-set-badge"><span class="material-symbols-outlined" style="font-size:13px">check_circle</span>Set</div>' : '') +
+        '<div class="tm-server-actions">' +
+          '<button type="button" class="btn btn-g btn-sm" onclick="tmOpenServerModal(\'' + escAttr(srv.node_id) + '\')">' + esc(t('tm.editServer')) + '</button>' +
+          '<button type="button" class="btn btn-g btn-sm" onclick="tmPingThis(\'' + escAttr(srv.node_id) + '\')">' + esc(t('proxy.pingBtn')) + '</button>' +
+          '<button type="button" class="btn btn-g btn-sm" onclick="tmDeleteServer(\'' + escAttr(srv.node_id) + '\')">' + esc(t('delete')) + '</button>' +
+        '</div>' +
+      '</div></div>';
+  });
+  wrap.innerHTML = html;
+}
+
+// One value, rendered wherever the client-side latency appears.
+function tmClientPingText(nodeId) {
+  var p = TM.pings[nodeId];
+  if (p && p.testing) return t('tm.measuring');
+  if (p && p.clientMs != null) return Math.round(p.clientMs) + ' ms';
+  if (p && p.clientMs === null) return t('tm.offline');
+  return '—';
+}
+function tmClientPingDown(nodeId) {
+  var p = TM.pings[nodeId];
+  return !!(p && p.testing) || (p && p.clientMs === null);
+}
+
+// Same behaviour as the Node accordions, without depending on their id scheme.
+function tmToggleServerAcc(btn) {
+  var acc = btn && btn.parentElement;
+  if (!acc) return;
+  var open = !acc.classList.contains('open');
+  acc.classList.toggle('open', open);
+  btn.setAttribute('aria-expanded', String(open));
+  var body = acc.querySelector('.spd-acc-body');
+  if (body) body.setAttribute('aria-hidden', String(!open));
+}
+
+var TM_EDIT_SERVER = '';
+
+function tmOpenServerModal(nodeId) {
+  TM_EDIT_SERVER = nodeId || '';
+  var srv = nodeId ? tmServerById(nodeId) : null;
+  var tEl = $t('tm-server-modal-title');
+  if (tEl) tEl.textContent = nodeId ? t('tm.editServerTitle') : t('tm.addServerTitle');
+  $t('tm-srv-name').value = srv ? (srv.name || '') : '';
+  $t('tm-srv-domain').value = srv ? (srv.domain || '') : '';
+  var key = $t('tm-srv-key');
+  key.value = '';
+  key.required = !srv;
+  // The stored key is never echoed back: only its masked form, as a placeholder.
+  key.placeholder = (srv && srv.api_key_masked) ? srv.api_key_masked : 'spdr_xxxxxxxxx';
+  $t('tm-srv-key-hint').textContent = srv
+    ? t('tm.keyNeverShown').replace('{{masked}}', srv.api_key_masked || '—')
+    : t('tm.keyHint');
+  $t('mod-tm-server').classList.add('show');
+}
+
+async function tmSubmitServer(e) {
+  e.preventDefault();
+  var name = $t('tm-srv-name').value.trim();
+  var domain = $t('tm-srv-domain').value.trim();
+  var apiKey = $t('tm-srv-key').value.trim();
+  if (!domain) { toast(t('tm.fillDomain'), 'err'); return; }
+  if (!TM_EDIT_SERVER && !apiKey) { toast(t('tm.errorApiKey'), 'err'); return; }
+  var btn = $t('tm-srv-submit');
+  if (btn) btn.disabled = true;
+  try {
+    var body = { name: name, domain: domain };
+    if (apiKey) body.api_key = apiKey;   // empty while editing = keep the stored key
+    var r = TM_EDIT_SERVER
+      ? await api('/api/tm/servers/' + encodeURIComponent(TM_EDIT_SERVER), { method: 'PATCH', body: body })
+      : await api('/api/tm/servers', { method: 'POST', body: body });
+    if (r && r.ok) toast(TM_EDIT_SERVER ? t('tm.serverSaved') : t('tm.serverAdded'), 'ok');
+    else toast((r && r.error) || t('tm.serverSavedOffline'), 'warn');
+    closeModal('mod-tm-server');
+    await loadTM();
+    if (typeof loadNodes === 'function') loadNodes();
+  } catch (err) { toast(err.message || t('tm.remoteOffline'), 'err'); }
+  if (btn) btn.disabled = false;
+}
+
+// The backend health probe. Its number is kept apart from the client ping in
+// every place it is shown, and it never overwrites a client measurement.
+async function tmPingServerHealth(nodeId) {
+  var el = $t('tm-srv-ping-' + nodeId);
+  if (el) { el.classList.add('busy'); el.textContent = t('tm.pinging'); }
+  try {
+    var r = await api('/api/tm/servers/' + encodeURIComponent(nodeId) + '/ping', { method: 'POST' });
+    if (!r.ok) toast(r.last_error || t('tm.remoteOffline'), 'err');
+  } catch (e) { toast(e.message || t('tm.remoteOffline'), 'err'); }
+  await loadTM();
+}
+
+async function tmDeleteServer(nodeId) {
+  if (!confirm(t('tm.confirmDelServer'))) return;
+  try {
+    await api('/api/tm/servers/' + encodeURIComponent(nodeId), { method: 'DELETE' });
+    toast(t('tm.serverDeleted'), 'ok');
+    await loadTM();
+    if (typeof loadNodes === 'function') loadNodes();
+  } catch (e) { toast(e.message || t('toast.err'), 'err'); }
+}
+
+// "Set" = use this server for generating the configuration. Real backend state.
+async function tmSetServer(nodeId) {
+  try {
+    var r = await api('/api/tm/set-server', { method: 'POST', body: { node_id: nodeId } });
+    TM.activeServer = (r.graph && r.graph.active_server) || '';
+    TM.status = r.status || TM.status;
+    toast(nodeId ? t('tm.setDone') : t('tm.setClear'), 'ok');
+    tmRenderGraph();
+    tmRenderServers();
+    tmRenderStatus();
+    tmGenerate();
+    tmScheduleApply();        // the chosen entry point changes every hop
+  } catch (e) { toast(e.message || t('toast.err'), 'err'); }
+}
+
+function tmClearSet() { return tmSetServer(''); }
+
+// One button, two honest numbers: the client ping is measured by this browser
+// against the server's own endpoint, the health number by the panel backend.
+async function tmPingServer(nodeId) {
+  TM.pings[nodeId] = { clientMs: null, testing: true, at: Date.now() };
+  tmUpdatePingUI(nodeId);
+  await Promise.all([tmPingNode(nodeId, 3), tmPingServerHealth(nodeId)]);
+}
+
+// Run once per tab visit for the servers that have no measurement yet.
+function tmPingAllMissing() {
+  TM.servers.forEach(function (srv) {
+    if (!TM.pings[srv.node_id]) tmPingNode(srv.node_id, 3);
+  });
+}
+
+// ─── Client-side ping (measured by THIS browser, never by the panel) ────────
+function tmRemoteOrigin(domain) {
+  var d = String(domain || '').trim().replace(/\/+$/, '');
+  if (!d) return '';
+  if (/^https?:\/\//i.test(d)) return d;
+  var host = d.split('/')[0];
+  if (/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(host)) return 'http://' + d;
+  return 'https://' + d;
+}
+
+function tmMeasureOnce(url) {
+  return new Promise(function (resolve) {
+    var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var done = false;
+    var finish = function (v) { if (!done) { done = true; clearTimeout(timer); resolve(v); } };
+    var timer = setTimeout(function () { if (ctrl) { try { ctrl.abort(); } catch (e) {} } finish(null); }, 4500);
+    var started = (window.performance && performance.now) ? performance.now() : Date.now();
+    var opts = { cache: 'no-store', credentials: 'omit', mode: 'cors' };
+    if (ctrl) opts.signal = ctrl.signal;
+    fetch(url, opts).then(function (r) {
+      return r.text().then(function (txt) {
+        var now = (window.performance && performance.now) ? performance.now() : Date.now();
+        var ok = false;
+        try { var j = JSON.parse(txt); ok = !!(j && j.service === 'spider-tm'); } catch (e) { ok = false; }
+        // Only a real TM panel answers with this marker — a captive portal or a
+        // random host that returns 200 must never look like a successful ping.
+        finish((r.ok && ok) ? (now - started) : null);
+      });
+    }).catch(function () { finish(null); });
+  });
+}
+
+async function tmPingNode(nodeId, samples) {
+  var srv = tmServerById(nodeId);
+  if (!srv) return null;
+  var origin = tmRemoteOrigin(srv.domain);
+  if (!origin) { TM.pings[nodeId] = { clientMs: null, testing: false, at: Date.now() }; tmUpdatePingUI(nodeId); return null; }
+  var url = origin + '/api/tm/peer/ping?_=' + Date.now();
+  var count = samples || 3;
+  var results = [];
+  for (var i = 0; i < count; i++) {
+    // Each sample is a fresh, cache-busted connection: no keep-alive reuse, so
+    // the number describes the network path rather than a warm socket.
+    var ms = await tmMeasureOnce(url + '&n=' + i);
+    if (ms != null) results.push(ms);
+    if (i < count - 1) await tmSleep(110);
+  }
+  if (!results.length) {
+    TM.pings[nodeId] = { clientMs: null, testing: false, at: Date.now() };
+    tmUpdatePingUI(nodeId);
+    return null;
+  }
+  results.sort(function (a, b) { return a - b; });
+  var median = results[Math.floor(results.length / 2)];
+  TM.pings[nodeId] = { clientMs: median, testing: false, at: Date.now(), samples: results.length };
+  tmUpdatePingUI(nodeId);
+  return median;
+}
+
+// Re-render only what shows this node's client latency: the canvas box, the
+// Server accordion header and body, and the swap-view row.
+function tmUpdatePingUI(nodeId) {
+  var txt = tmClientPingText(nodeId);
+  var off = tmClientPingDown(nodeId);
+  ['tm-node-lat-' + nodeId, 'tm-node-cping-' + nodeId, 'tm-srv-cping-' + nodeId].forEach(function (id) {
+    var el = $t(id);
+    if (el) { el.textContent = txt; el.classList.toggle('off', off && !el.id.startsWith('tm-node-lat')); }
+  });
+  var bodyEl = $t('tm-srv-cping-body-' + nodeId);
+  if (bodyEl) {
+    bodyEl.textContent = txt;
+    bodyEl.classList.toggle('off', off);
+  }
+}
+
+// ─── Canvas geometry ────────────────────────────────────────────────────────
+function tmZoom(screenX, screenY, factor) {
+  var old = TM.zoom;
+  var next = Math.max(0.35, Math.min(2.4, old * factor));
+  if (next === old) return;
+  if (screenX != null) {
+    // Keep the point under the fingers/cursor anchored while zooming.
+    TM.panX = screenX - (screenX - TM.panX) * (next / old);
+    TM.panY = screenY - (screenY - TM.panY) * (next / old);
+  }
+  TM.zoom = next;
+  tmApplyTransform();
+}
+
+function tmZoomButton(factor) {
+  var canvas = $t('tm-canvas');
+  if (!canvas) return;
+  var r = canvas.getBoundingClientRect();
+  tmZoom(r.width / 2, r.height / 2, factor);
+}
+
+function tmApplyTransform() {
+  var tr = 'translate(' + TM.panX + 'px,' + TM.panY + 'px) scale(' + TM.zoom + ')';
+  var layer = $t('tm-node-layer');
+  if (layer) { layer.style.transformOrigin = '0 0'; layer.style.transform = tr; }
+  var svg = $t('tm-edges');
+  if (svg) { svg.style.transformOrigin = '0 0'; svg.style.transform = tr; }
+}
+
+function tmFit() {
+  var canvas = $t('tm-canvas');
+  if (!canvas || !TM.servers.length) return;
+  var r = canvas.getBoundingClientRect();
+  if (!r.width) return;
+  var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  TM.servers.forEach(function (s) {
+    var size = TM.sizes[s.node_id] || { w: 180, h: 64 };
+    minX = Math.min(minX, s.x); minY = Math.min(minY, s.y);
+    maxX = Math.max(maxX, s.x + size.w); maxY = Math.max(maxY, s.y + size.h);
+  });
+  var pad = 26;
+  var w = Math.max(1, maxX - minX), h = Math.max(1, maxY - minY);
+  var zoom = Math.min((r.width - pad * 2) / w, (r.height - pad * 2) / h);
+  TM.zoom = Math.max(0.35, Math.min(1.15, zoom));
+  TM.panX = pad + (r.width - pad * 2 - w * TM.zoom) / 2 - minX * TM.zoom;
+  TM.panY = pad + (r.height - pad * 2 - h * TM.zoom) / 2 - minY * TM.zoom;
+  tmApplyTransform();
+}
+
+function tmCanvasPoint(clientX, clientY) {
+  var canvas = $t('tm-canvas');
+  var r = canvas.getBoundingClientRect();
+  return {
+    x: (clientX - r.left - TM.panX) / TM.zoom,
+    y: (clientY - r.top - TM.panY) / TM.zoom
+  };
+}
+
+// Half-extent intersection of the line leaving the box centre in direction (ux,uy).
+function tmBoxExit(cx, cy, ux, uy, hw, hh) {
+  var tx = Math.abs(ux) < 1e-6 ? Infinity : hw / Math.abs(ux);
+  var ty = Math.abs(uy) < 1e-6 ? Infinity : hh / Math.abs(uy);
+  var tt = Math.min(tx, ty);
+  if (!isFinite(tt)) tt = 0;
+  return { x: cx + ux * tt, y: cy + uy * tt };
+}
+
+// The line picks its own shape: nearly centred boxes get a straight bar,
+// anything offset gets a curve. There is no manual shape control any more —
+// the only thing that overrides the automatic choice is a dragged bend.
+function tmAutoStyle(a, b) {
+  var acx = a.x + a.w / 2, acy = a.y + a.h / 2;
+  var bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
+  var dx = Math.abs(bcx - acx), dy = Math.abs(bcy - acy);
+  // Same row at roughly the same height → perfectly straight looks best.
+  return dy < Math.max(a.h, b.h) * 0.42 && dx > dy ? 'straight' : 'curved';
+}
+
+// `bend` is the perpendicular offset of the control point (0 = straight). The
+// geometry walks a bar that the operator dragged into a different shape, and
+// falls back to its own straight/curved decision when nothing was dragged.
+function tmEdgeGeometry(a, b, style, bend) {
+  var aw = a.w, ah = a.h, bw = b.w, bh = b.h;
+  var acx = a.x + aw / 2, acy = a.y + ah / 2;
+  var bcx = b.x + bw / 2, bcy = b.y + bh / 2;
+  var dx = bcx - acx, dy = bcy - acy;
+  var len = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+  var ux = dx / len, uy = dy / len;
+  var start = tmBoxExit(acx, acy, ux, uy, aw / 2, ah / 2);
+  var end = tmBoxExit(bcx, bcy, -ux, -uy, bw / 2, bh / 2);
+  // A small gap on both ends so the bar never touches the boxes.
+  start = { x: start.x + ux * 3, y: start.y + uy * 3 };
+  end = { x: end.x - ux * 3, y: end.y - uy * 3 };
+  var mx = (start.x + end.x) / 2, my = (start.y + end.y) / 2;
+  var measured = !!(TM.sizes[a.node_id] || TM.sizes[b.node_id]);
+  var shape;
+  if (bend != null) {
+    // A bar the operator dragged keeps the shape they gave it.
+    shape = Math.abs(bend) < 6 ? 'straight' : 'curved';
+  } else {
+    shape = measured ? tmAutoStyle(a, b) : 'curved';
+  }
+  if (shape === 'straight') {
+    return { shape: 'straight', d: 'M' + start.x + ',' + start.y + ' L' + end.x + ',' + end.y, mid: { x: mx, y: my }, start: start, end: end, ux: ux, uy: uy };
+  }
+  var off = (bend != null) ? bend : Math.min(70, len * 0.18);
+  var cx = mx - uy * off, cy = my + ux * off;
+  var d = 'M' + start.x + ',' + start.y + ' Q' + cx + ',' + cy + ' ' + end.x + ',' + end.y;
+  // Midpoint of a quadratic curve — where the little control chip sits.
+  return {
+    shape: 'curved',
+    d: d,
+    mid: { x: 0.25 * start.x + 0.5 * cx + 0.25 * end.x, y: 0.25 * start.y + 0.5 * cy + 0.25 * end.y },
+    control: { x: cx, y: cy },
+    start: start, end: end, ux: ux, uy: uy
+  };
+}
+
+// ─── Graph rendering ────────────────────────────────────────────────────────
+function tmRenderGraph() {
+  tmRenderNodes();
+  tmRenderEdges();
+  tmApplyTransform();
+  // The link keys are a mode of their own: the bar says which end is still
+  // missing instead of hiding the state in a toolbar button.
+  var modeEl = $t('tm-mode-label');
+  if (modeEl) {
+    if (TM.pendingSrc) {
+      modeEl.textContent = t('tm.hlFrom').replace('{{src}}', tmNodeName(TM.pendingSrc));
+    } else if (TM.pendingDst) {
+      modeEl.textContent = t('tm.hlTo').replace('{{dst}}', tmNodeName(TM.pendingDst));
+    } else {
+      modeEl.textContent = '';
+    }
+  }
+  var canvas = $t('tm-canvas');
+  if (canvas) canvas.classList.toggle('connect', !!(TM.pendingSrc || TM.pendingDst));
+}
+
+function tmRenderNodes() {
+  var layer = $t('tm-node-layer');
+  if (!layer) return;
+  if (!TM.servers.length) {
+    layer.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--txt2);font-size:12.5px">' + esc(t('tm.noServers')) + '</div>';
+    return;
+  }
+  var html = '';
+  TM.servers.forEach(function (srv) {
+    var role = tmRoleOf(srv.node_id);
+    var roleCls = role && role.role ? role.role : '';
+    var online = srv.status === 'online' ? 'on' : 'off';
+    var p = TM.pings[srv.node_id];
+    var pingTxt = (p && p.testing) ? t('tm.measuring')
+      : (p && p.clientMs != null) ? Math.round(p.clientMs) + ' ms'
+      : p ? t('tm.offline')
+      : (srv.server_latency_ms != null ? Math.round(srv.server_latency_ms) + ' ms' : '—');
+    var pingOff = !!(p && p.clientMs == null) || (p && p.testing);
+    var isSrc = TM.pendingSrc === srv.node_id;
+    var isDst = TM.pendingDst === srv.node_id;
+    html += '<div class="tm-node' + (TM.activeServer === srv.node_id ? ' set-node' : '') +
+        (isSrc || isDst ? ' connect-src' : '') +
+        (TM.openNode === srv.node_id ? ' open' : '') + '" data-node="' + escAttr(srv.node_id) + '"' +
+        ' style="left:0;top:0;transform:translate(' + Math.round(srv.x) + 'px,' + Math.round(srv.y) + 'px)">' +
+      // Source key: sits behind the box, sticking out of its back edge.
+      '<button type="button" class="tm-link-key from' + (isSrc ? ' hot' : '') + '"' +
+        ' onclick="tmPickLink(event,\'' + escAttr(srv.node_id) + '\',\'from\')"' +
+        ' title="' + escAttr(t('tm.keyFrom')) + '" aria-label="' + escAttr(t('tm.keyFrom')) + '">' +
+        '<span class="material-symbols-outlined">outbox</span></button>' +
+      '<div class="tm-node-head">' +
+        '<div style="flex:1;min-width:0">' +
+          '<div class="tm-node-title">' + esc(srv.country_flag + ' ' + srv.name) + '</div>' +
+          '<div class="tm-node-role ' + escAttr(roleCls) + '">' + esc(tmRoleLabel(srv.node_id) || t('tm.role.idle')) + '</div>' +
+        '</div>' +
+        // Destination key: sits on the face of the box.
+        '<button type="button" class="tm-link-key to' + (isDst ? ' hot' : '') + '"' +
+          ' onclick="tmPickLink(event,\'' + escAttr(srv.node_id) + '\',\'to\')"' +
+          ' title="' + escAttr(t('tm.keyTo')) + '" aria-label="' + escAttr(t('tm.keyTo')) + '">' +
+          '<span class="material-symbols-outlined">login</span></button>' +
+        '<span class="tm-node-lat' + (pingOff ? ' off' : '') + '" id="tm-node-lat-' + escAttr(srv.node_id) + '" dir="ltr">' + esc(pingTxt) + '</span>' +
+        '<button type="button" class="tm-node-btn" onclick="tmToggleNode(event,\'' + escAttr(srv.node_id) + '\')" aria-label="expand">' +
+          '<span class="material-symbols-outlined">expand_more</span></button>' +
+      '</div>' +
+      '<div class="tm-node-info">' +
+        '<div class="tm-server-kv"><span>' + esc(t('nodeDomain')) + '</span><b dir="ltr">' + esc(srv.domain || '—') + '</b></div>' +
+        '<div class="tm-server-kv"><span>' + esc(t('tm.clientPing')) + '</span><b class="tm-srv-ping' + (pingOff ? ' off' : '') + '" id="tm-node-cping-' + escAttr(srv.node_id) + '" dir="ltr">' + esc(pingTxt) + '</b></div>' +
+        '<div class="tm-server-kv"><span>' + esc(t('nodeStatusLabel')) + '</span><b class="tm-srv-ping ' + online + '">' + esc(srv.status || '—') + '</b></div>' +
+        '<div class="tm-node-actions">' +
+          '<button type="button" class="btn btn-g btn-sm" onclick="tmOpenServerModal(\'' + escAttr(srv.node_id) + '\')">' + esc(t('tm.editServer')) + '</button>' +
+          '<button type="button" class="btn btn-g btn-sm" onclick="tmPingThis(\'' + escAttr(srv.node_id) + '\')">' + esc(t('proxy.pingBtn')) + '</button>' +
+          '<button type="button" class="btn ' + (TM.activeServer === srv.node_id ? 'btn-p' : 'btn-g') + ' btn-sm" onclick="tmSetServer(\'' + escAttr(srv.node_id) + '\')">Set</button>' +
+        '</div>' +
+        (TM.activeServer === srv.node_id ? '<div class="tm-set-badge"><span class="material-symbols-outlined" style="font-size:13px">check_circle</span>Set</div>' : '') +
+      '</div>' +
+    '</div>';
+  });
+  layer.innerHTML = html;
+  tmMeasureNodes();
+}
+
+function tmMeasureNodes() {
+  TM.sizes = {};
+  TM.servers.forEach(function (srv) {
+    var el = document.querySelector('.tm-node[data-node="' + srv.node_id + '"]');
+    if (!el) return;
+    var w = el.offsetWidth, h = el.offsetHeight;
+    if (w > 0 && h > 0) TM.sizes[srv.node_id] = { w: w, h: h };
+  });
+}
+
+function tmNodeBox(nodeId) {
+  var srv = tmServerById(nodeId);
+  var size = TM.sizes[nodeId] || { w: 176, h: 62 };
+  return { x: (srv ? srv.x : 0), y: (srv ? srv.y : 0), w: size.w, h: size.h, node_id: nodeId };
+}
+
+// The bend value a bar carries: how far its control point sits from the cord.
+function tmEdgeBend(edge) {
+  return (edge.bend == null) ? null : Number(edge.bend);
+}
+
+function tmRenderEdges() {
+  var g = $t('tm-edge-layer');
+  if (!g) return;
+  var html = '';
+  TM.edges.forEach(function (edge) {
+    var a = tmNodeBox(edge.from), b = tmNodeBox(edge.to);
+    var geo = tmEdgeGeometry(a, b, edge.style, tmEdgeBend(edge));
+    var cls = 'tm-edge ' + (geo.shape === 'straight' ? 'straight' : 'curved');
+    cls += (TM.appliedChain.indexOf(edge.from) >= 0 && TM.appliedChain.indexOf(edge.to) >= 0) ? ' active-edge' : ' idle-edge';
+    if (TM.selectedEdge === edge.id) cls += ' selected';
+    // A wide invisible stroke under the visible one: taps on a 2px line are
+    // impossible on a phone, and the visible line stays thin.
+    html += '<path class="tm-edge-hit" data-edge="' + escAttr(edge.id) + '" d="' + geo.d + '"></path>';
+    html += '<path class="' + cls + '" data-edge="' + escAttr(edge.id) + '" d="' + geo.d + '"></path>';
+  });
+  // A re-render also drops the dashed cord of a cancelled drag (innerHTML
+  // above), and tmBarMove recreates it on the next pointer move.
+  g.innerHTML = html;
+  tmRenderEdgeChip();
+}
+
+// Coalesce the edge redraws that follow a node or bar drag into one per frame.
+function tmRenderEdgesSoon() {
+  if (TM.edgeFrame) return;
+  TM.edgeFrame = requestAnimationFrame(function () {
+    TM.edgeFrame = null;
+    tmRenderEdges();
+  });
+}
+
+// Entry → exit latency: the panel asks the entry server to walk its own branch
+// to the exit, so the number is the round trip the traffic really makes — never
+// a browser measurement and never a single link pretending to be the chain.
+var TM_CHAIN_PING_MS = 12000;
+var TM_CHAIN_PING_TIMER = null;
+
+async function tmChainPing() {
+  var out = $t('tm-sb-chain-ping');
+  var btn = $t('tm-sb-chain-ping-btn');
+  if (out) { out.textContent = t('tm.measuring'); out.classList.add('off'); }
+  if (btn) btn.classList.add('busy');
+  try {
+    var r = await api('/api/tm/chain-ping', { method: 'POST', body: {} });
+    if (out) {
+      if (r && r.total_ms != null) {
+        out.textContent = Math.round(r.total_ms) + ' ms';
+        out.classList.remove('off');
+      } else {
+        out.textContent = t('tm.offline');
+        out.classList.add('off');
+        var bad = (r && r.hops || []).filter(function (h) { return !h.ok && h.error; })[0];
+        toast(bad ? bad.error : (r && r.error) || t('tm.offline'), 'warn');
+      }
+    }
+    // The number is temporary, like every other measured key.
+    clearTimeout(TM_CHAIN_PING_TIMER);
+    TM_CHAIN_PING_TIMER = setTimeout(function () {
+      var el = $t('tm-sb-chain-ping');
+      if (el) { el.textContent = '—'; el.classList.add('off'); }
+    }, TM_CHAIN_PING_MS);
+  } catch (e) {
+    if (out) { out.textContent = t('tm.offline'); out.classList.add('off'); }
+    toast(e.message || t('tm.offline'), 'err');
+  }
+  if (btn) btn.classList.remove('busy');
+}
+
+// One shared chip per link, carrying its tiny ping SVG. Tapping the SVG runs a
+// chain ping across the link — server-to-server, never a browser number.
+// Dragging the chip moves the whole bar; dragging either of its round ends
+// pulls that end to another box and snaps onto it.
+var TM_CHIP_PING_MS = 12000;   // how long a measured number stays on a chip
+var TM_NODE_AUTO_MS = 14000;    // how long an expanded node popover stays open
+
+function tmRenderEdgeChip() {
+  var layer = $t('tm-node-layer');
+  if (!layer) return;
+  document.querySelectorAll('.tm-edge-label, .tm-edge-handle').forEach(function (el) { el.remove(); });
+  TM.edges.forEach(function (edge) {
+    var a = tmNodeBox(edge.from), b = tmNodeBox(edge.to);
+    var geo = tmEdgeGeometry(a, b, edge.style, tmEdgeBend(edge));
+    var chip = document.createElement('div');
+    chip.className = 'tm-edge-label draggable';
+    chip.dataset.edge = edge.id;
+    chip.style.left = geo.mid.x + 'px';
+    chip.style.top = geo.mid.y + 'px';
+    var age = TM.edgePingAt[edge.id] ? (Date.now() - TM.edgePingAt[edge.id]) : Infinity;
+    var hidePing = TM.edgePingBusy !== edge.id && age > TM_CHIP_PING_MS;
+    var res = (TM.edgePings[edge.id] != null && !hidePing)
+      ? '<b dir="ltr">' + Math.round(TM.edgePings[edge.id]) + ' ms</b>'
+      : '';
+    chip.innerHTML =
+      '<button type="button" class="tm-edge-ping' + (TM.edgePingBusy === edge.id ? ' busy' : '') + '"' +
+        ' title="' + escAttr(t('tm.chainPing')) + '" onclick="tmPingEdge(event,\'' + escAttr(edge.id) + '\')" aria-label="' + escAttr(t('tm.chainPing')) + '">' +
+        '<svg class="tm-link-ping-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">' +
+          '<path d="M2 12h4"/><path d="M18 12h4"/>' +
+          '<path d="M8 12a4 4 0 0 1 8 0" opacity=".55"/>' +
+          '<path d="M6 12a6 6 0 0 1 12 0" opacity=".3"/>' +
+          '<circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>' +
+        '</svg>' + res + '</button>' +
+      '<button type="button" title="' + escAttr(t('delete')) + '" onclick="tmDeleteEdge(event,\'' + escAttr(edge.id) + '\')"><span class="material-symbols-outlined">delete</span></button>';
+    layer.appendChild(chip);
+    // Only the selected bar shows its two ends — otherwise every bar would be
+    // covered in handles.
+    if (TM.selectedEdge !== edge.id) return;
+    ['from', 'to'].forEach(function (which) {
+      var handle = document.createElement('div');
+      handle.className = 'tm-edge-handle';
+      var pt = (which === 'from') ? geo.start : geo.end;
+      handle.style.left = pt.x + 'px';
+      handle.style.top = pt.y + 'px';
+      layer.appendChild(handle);
+    });
+  });
+  tmArmChipTimer();
+}
+
+// After a ping the number stays for a while, then disappears by itself.
+function tmArmChipTimer() {
+  clearTimeout(TM.chipTimer);
+  var now = Date.now();
+  var soonest = null;
+  TM.edges.forEach(function (edge) {
+    var at = TM.edgePingAt[edge.id];
+    if (!at) return;
+    var hideAt = at + TM_CHIP_PING_MS;
+    if (hideAt > now && (soonest == null || hideAt < soonest)) soonest = hideAt;
+  });
+  if (soonest == null) return;
+  TM.chipTimer = setTimeout(function () {
+    var changed = false;
+    TM.edges.forEach(function (edge) {
+      var at = TM.edgePingAt[edge.id];
+      if (at && Date.now() - at > TM_CHIP_PING_MS) { delete TM.edgePingAt[edge.id]; changed = true; }
+    });
+    // Re-render only when the chip is not being dragged right now.
+    if (changed && !TM.bar) tmRenderEdges();
+  }, soonest - now + 30);
+}
+
+// The expanded node popover is temporary: it closes itself after a while, so
+// the canvas cannot end up covered in open boxes.
+function tmArmNodeTimer() {
+  clearTimeout(TM.nodeTimer);
+  if (!TM.openNode) return;
+  TM.nodeTimer = setTimeout(function () {
+    if (TM.openNode) { TM.openNode = ''; tmRenderGraph(); }
+  }, TM_NODE_AUTO_MS);
+}
+
+// Chain ping for exactly one link: this panel pings `from` and asks `from` to
+// ping `to`. A pure server-to-server number, shown beside the bar.
+async function tmPingEdge(event, edgeId) {
+  if (event) { event.stopPropagation(); if (event.preventDefault) event.preventDefault(); }
+  var edge = tmEdgeById(edgeId);
+  if (!edge) return;
+  TM.edgePingBusy = edgeId;
+  TM.edgePings[edgeId] = null;
+  delete TM.edgePingAt[edgeId];
+  tmRenderEdges();
+  try {
+    var body = { active_server: TM.activeServer, from: edge.from, to: edge.to };
+    var r = await api('/api/tm/edge-ping', { method: 'POST', body: body });
+    TM.edgePings[edgeId] = (r && r.ms != null) ? r.ms : null;
+    TM.edgePingAt[edgeId] = Date.now();
+    if (r && r.ms == null) toast(r.error || t('tm.offline'), 'warn');
+  } catch (e) {
+    TM.edgePings[edgeId] = null;
+    delete TM.edgePingAt[edgeId];
+    toast(e.message || t('tm.offline'), 'err');
+  }
+  TM.edgePingBusy = '';
+  tmRenderEdges();
+}
+
+// ─── Edge editing ───────────────────────────────────────────────────────────
+async function tmDeleteEdge(event, edgeId) {
+  if (event) { event.stopPropagation(); if (event.preventDefault) event.preventDefault(); }
+  var id = edgeId || TM.selectedEdge;
+  if (!id) return;
+  var edge = tmEdgeById(id);
+  if (!edge) return;
+  var backup = TM.edges.slice();
+  TM.edges = TM.edges.filter(function (e) { return e.id !== id; });
+  if (TM.selectedEdge === id) TM.selectedEdge = '';
+  var ok = await tmValidateEdges(t('tm.edgeDeleted'));
+  if (!ok) {
+    TM.edges = backup;
+    TM.selectedEdge = id;
+    tmRenderGraph();
+    return;
+  }
+  delete TM.edgePings[id];
+  delete TM.edgePingAt[id];
+  tmRenderGraph();
+  toast(t('tm.edgeDeleted'), 'ok');
+  tmScheduleApply(0);
+}
+
+// The two link keys on a box replace any "Connect" button:
+//   * the key ON the face of the box     → this box becomes the DESTINATION
+//   * the key BEHIND the box (its port)  → this box becomes the SOURCE
+// As soon as both ends are picked the connection is created. With a line
+// already selected, a key re-points that line instead — that is "change
+// destination" without a separate dialog.
+async function tmPickLink(event, nodeId, kind) {
+  if (event) { event.stopPropagation(); if (event.preventDefault) event.preventDefault(); }
+
+  var selected = tmEdgeById(TM.selectedEdge);
+  if (selected) {
+    var from = selected.from, to = selected.to;
+    if (kind === 'from' && nodeId !== from) {
+      selected.from = nodeId;
+      TM.selectedEdge = '';
+      return tmRetarget(selected, from, to, 'from');
+    }
+    if (kind === 'to' && nodeId !== to) {
+      selected.to = nodeId;
+      TM.selectedEdge = '';
+      return tmRetarget(selected, from, to, 'to');
+    }
+  }
+
+  if (kind === 'from') {
+    TM.pendingSrc = (TM.pendingSrc === nodeId) ? '' : nodeId;
+    if (TM.pendingSrc) { TM.pendingDst = ''; TM.pendingFromKey = 'from'; }
+  } else {
+    TM.pendingDst = (TM.pendingDst === nodeId) ? '' : nodeId;
+    if (TM.pendingDst) { TM.pendingSrc = ''; TM.pendingFromKey = 'to'; }
+  }
+  if (TM.pendingSrc && TM.pendingDst) {
+    var src = TM.pendingSrc, dst = TM.pendingDst;
+    TM.pendingSrc = ''; TM.pendingDst = '';
+    tmCancelDraw();
+    return tmAddEdge(src, dst);
+  }
+  if (TM.pendingSrc || TM.pendingDst) tmStartDraw();
+  else tmCancelDraw();
+  tmRenderGraph();
+}
+
+// ─── Live link drawing ──────────────────────────────────────────────────────
+// After a link key is pressed the bar follows the pointer immediately — the
+// connection is not created only after the second key; the user sees what they
+// are connecting while they move.
+var TM_DRAW_PX = 26;   // how close the pointer must get for the magnet to lock
+
+function tmDrawAnchor() {
+  var id = TM.pendingFromKey === 'to' ? TM.pendingDst : TM.pendingSrc;
+  return tmNodeBox(id);
+}
+
+function tmStartDraw() {
+  tmCancelDraw();
+  var svgLayer = $t('tm-edge-layer');
+  if (!svgLayer) return;
+  var line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  line.setAttribute('id', 'tm-draw-line');
+  line.setAttribute('class', 'tm-edge-dangle');
+  svgLayer.appendChild(line);
+  var box = tmDrawAnchor();
+  var cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+  line.setAttribute('d', 'M' + cx + ',' + cy + ' L' + cx + ',' + cy);
+  var canvas = $t('tm-canvas');
+  if (canvas) {
+    canvas.addEventListener('pointermove', tmDrawMove);
+    canvas.addEventListener('pointerdown', tmDrawClick, { capture: true });
+  }
+}
+
+function tmDrawMove(e) {
+  var line = $t('tm-draw-line');
+  if (!line) return;
+  var pt = tmCanvasPoint(e.clientX, e.clientY);
+  var box = tmDrawAnchor();
+  var cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+  line.setAttribute('d', 'M' + cx + ',' + cy + ' L' + pt.x + ',' + pt.y);
+  // Magnet: when the pointer hovers over a box that could receive the link,
+  // light it up so the user knows where a click will land.
+  var fixed = TM.pendingFromKey === 'to' ? TM.pendingDst : TM.pendingSrc;
+  var hoverId = '';
+  var nodeEl = document.elementFromPoint(e.clientX, e.clientY);
+  var hover = nodeEl && nodeEl.closest && nodeEl.closest('.tm-node');
+  if (hover) hoverId = hover.dataset.node || '';
+  tmShowSnap(hoverId && hoverId !== fixed ? hoverId : '');
+}
+
+function tmDrawClick(e) {
+  // A click on the canvas completes the link to whatever box is under the
+  // pointer; clicking empty space cancels the pending link.
+  e.stopPropagation();
+  e.preventDefault();
+  var fixed = TM.pendingFromKey === 'to' ? TM.pendingDst : TM.pendingSrc;
+  var nodeEl = document.elementFromPoint(e.clientX, e.clientY);
+  var hover = nodeEl && nodeEl.closest && nodeEl.closest('.tm-node');
+  var target = hover ? (hover.dataset.node || '') : '';
+  var src, dst;
+  if (TM.pendingFromKey === 'to') { src = target; dst = fixed; }
+  else { src = fixed; dst = target; }
+  tmCancelDraw();
+  tmClearSnap();
+  if (target && target !== fixed) {
+    tmAddEdge(src, dst);
+  } else {
+    TM.pendingSrc = ''; TM.pendingDst = '';
+    tmRenderGraph();
+  }
+}
+
+function tmCancelDraw() {
+  var line = $t('tm-draw-line');
+  if (line) line.remove();
+  var canvas = $t('tm-canvas');
+  if (canvas) {
+    canvas.removeEventListener('pointermove', tmDrawMove);
+    canvas.removeEventListener('pointerdown', tmDrawClick, { capture: true });
+  }
+  tmClearSnap();
+}
+
+async function tmRetarget(edge, wasFrom, wasTo, which) {
+  var backupEdge = { id: edge.id, from: wasFrom, to: wasTo, style: edge.style };
+  var ok = await tmValidateEdges(t('tm.destChanged'));
+  if (!ok) {
+    edge.from = backupEdge.from;
+    edge.to = backupEdge.to;
+    TM.selectedEdge = edge.id;
+    tmRenderGraph();
+    return false;
+  }
+  await tmSaveGraph({});
+  tmRenderGraph();
+  toast(t('tm.destChanged'), 'ok');
+  tmScheduleApply(0);
+  return true;
+}
+
+// Ask the backend before committing: the graph is validated by the same code
+// that will run on Apply, so a bad link is refused here rather than at apply time.
+async function tmValidateEdges(failToast) {
+  try {
+    var r = await api('/api/tm/graph/validate', {
+      method: 'POST',
+      body: { edges: TM.edges, active_server: TM.activeServer }
+    });
+    if (r.ok) { TM.status = r.status || TM.status; return true; }
+    toast(r.error || (failToast || t('tm.invalid')), 'err');
+    return false;
+  } catch (e) {
+    toast(e.message || t('toast.err'), 'err');
+    return false;
+  }
+}
+
+async function tmAddEdge(from, to) {
+  if (!from || !to) return false;
+  if (from === to) { toast(t('tm.selfLoop'), 'warn'); tmRenderGraph(); return false; }
+  if (tmEdgeFor(from, to)) { toast(t('tm.duplicate'), 'warn'); tmRenderGraph(); return false; }
+  if (tmPathExists(to, from)) { toast(t('tm.cycle'), 'err'); tmRenderGraph(); return false; }
+
+  var edge = {
+    id: 'e_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    from: from, to: to,
+    style: tmAutoStyle(tmNodeBox(from), tmNodeBox(to))
+  };
+  var backup = TM.edges.slice();
+  TM.edges = TM.edges.concat([edge]);
+  tmRenderGraph();
+
+  if (!(await tmValidateEdges(t('tm.edgeAdded')))) {
+    TM.edges = backup;
+    tmRenderGraph();
+    return false;
+  }
+  await tmSaveGraph({});
+  tmRenderGraph();
+  toast(t('tm.edgeAdded'), 'ok');
+  tmScheduleApply(0);
+  return true;
+}
+
+// Is there already a path from `from` down to `to`? Used as
+// tmPathExists(newTo, newFrom) when adding edge from→to: a cycle exists iff
+// `to` can already reach `from`. Each node is visited once, so a graph that is
+// already a DAG can never loop this walk.
+function tmPathExists(from, to) {
+  var seen = {}, stack = [from];
+  while (stack.length) {
+    var cur = stack.pop();
+    if (cur === to) return true;
+    if (seen[cur]) continue;
+    seen[cur] = true;
+    TM.edges.forEach(function (e) { if (e.from === cur) stack.push(e.to); });
+  }
+  return false;
+}
+
+function tmCancelConnect() {
+  TM.pendingSrc = '';
+  TM.pendingDst = '';
+  tmRenderGraph();
+}
+
+function tmToggleNode(event, nodeId) {
+  if (event) event.stopPropagation();
+  TM.openNode = (TM.openNode === nodeId) ? '' : nodeId;
+  tmRenderGraph();
+  tmArmNodeTimer();
+}
+
+async function tmPingThis(nodeId) {
+  TM.pings[nodeId] = { clientMs: null, testing: true, at: Date.now() };
+  tmUpdatePingUI(nodeId);
+  var ms = await tmPingNode(nodeId, 3);
+  tmRenderGraph();
+  toast(ms != null ? (Math.round(ms) + ' ms') : t('tm.offline'), ms != null ? 'ok' : 'err');
+}
+
+// ─── Canvas interaction: pan, pinch, long-press drag ────────────────────────
+function tmBindCanvas() {
+  var canvas = $t('tm-canvas');
+  if (!canvas || canvas.dataset.tmBound) return;
+  canvas.dataset.tmBound = '1';
+
+  canvas.addEventListener('pointerdown', tmPointerDown);
+  canvas.addEventListener('pointermove', tmPointerMove);
+  canvas.addEventListener('pointerup', tmPointerUp);
+  canvas.addEventListener('pointercancel', tmPointerUp);
+  canvas.addEventListener('wheel', tmWheel, { passive: false });
+  canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+}
+
+function tmWheel(e) {
+  e.preventDefault();
+  var canvas = $t('tm-canvas');
+  var r = canvas.getBoundingClientRect();
+  tmZoom(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.12 : 1 / 1.12);
+}
+
+function tmPointerDown(e) {
+  var canvas = $t('tm-canvas');
+  if (!canvas) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  TM.pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+
+  // Two fingers: pinch-zoom, never a node drag.
+  var ids = Object.keys(TM.pointers);
+  if (ids.length === 2) {
+    tmCancelPress();
+    if (TM.bar) { tmCancelBar(); tmRenderEdges(); }
+    TM.drag = null;
+    TM.pan = null;
+    var a = TM.pointers[ids[0]], b = TM.pointers[ids[1]];
+    TM.pinch = { dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), zoom: TM.zoom };
+    return;
+  }
+  if (ids.length > 2) return;
+
+  var target = e.target;
+  var onButton = target.closest && target.closest('button');
+  if (onButton) return;              // let the node's own buttons work untouched
+
+  // A bar: grabbed either by its chip (move the whole bar) or by the line
+  // itself (also moves it; a tap with no movement just selects it).
+  var chip = target.closest && target.closest('.tm-edge-label');
+  var hit = target.closest && target.closest('.tm-edge-hit');
+  var barId = chip ? chip.dataset.edge : (hit ? hit.dataset.edge : '');
+  if (barId) {
+    tmActivateBar(canvas, e, barId, 'move', '');
+    return;
+  }
+
+  var nodeEl = target.closest && target.closest('.tm-node');
+  if (nodeEl) {
+    var nodeId = nodeEl.dataset.node;
+    if (TM.pendingSrc || TM.pendingDst) return;   // handled on pointerup as a tap
+    var start = tmCanvasPoint(e.clientX, e.clientY);
+    var srv = tmServerById(nodeId);
+    TM.press = {
+      nodeId: nodeId,
+      pointerId: e.pointerId,
+      startX: start.x,
+      startY: start.y,
+      originX: srv ? srv.x : 0,
+      originY: srv ? srv.y : 0,
+      moved: false,
+      activated: false
+    };
+    if (e.pointerType === 'mouse') {
+      tmActivateDrag(canvas, e);
+    } else {
+      // Long press to drag: a short touch gesture stays a scroll-ish tap and a
+      // quick swipe on the canvas pans instead of moving the node.
+      TM.press.timer = setTimeout(function () { tmActivateDrag(canvas, e); }, 320);
+    }
+    return;
+  }
+  // Empty canvas: pan (and clear any edge selection).
+  if (TM.selectedEdge) { TM.selectedEdge = ''; tmRenderEdges(); }
+  TM.pan = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, panX: TM.panX, panY: TM.panY };
+  canvas.classList.add('grabbing');
+}
+
+// ─── Magnetic bars ──────────────────────────────────────────────────────────
+// Two ways to move a bar: grab its chip (or the line) to shift the curve, grab
+// one of its round ends to pull that end to another box. The end sticks to a
+// box as soon as the pointer is close enough, and the link is re-pointed on
+// release — validation decides whether the new link is legal.
+var TM_SNAP_PX = 62;   // magnet radius in canvas units
+
+function tmSnapNodeAt(pt, exclude) {
+  var best = '', bestD = Infinity;
+  TM.servers.forEach(function (srv) {
+    if (exclude && exclude.indexOf(srv.node_id) >= 0) return;
+    var box = tmNodeBox(srv.node_id);
+    var cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+    var inside = pt.x >= box.x && pt.x <= box.x + box.w && pt.y >= box.y && pt.y <= box.y + box.h;
+    var d = inside ? 0 : Math.sqrt((pt.x - cx) * (pt.x - cx) + (pt.y - cy) * (pt.y - cy));
+    if (d < bestD) { bestD = d; best = srv.node_id; }
+  });
+  return (best && bestD <= TM_SNAP_PX) ? best : '';
+}
+
+function tmShowSnap(nodeId) {
+  if (TM.snapHl === nodeId) return;
+  tmClearSnap();
+  if (!nodeId) return;
+  TM.snapHl = nodeId;
+  var el = document.querySelector('.tm-node[data-node="' + nodeId + '"]');
+  if (el) el.classList.add('snap-target');
+}
+
+function tmClearSnap() {
+  if (!TM.snapHl) return;
+  var el = document.querySelector('.tm-node[data-node="' + TM.snapHl + '"]');
+  if (el) el.classList.remove('snap-target');
+  TM.snapHl = '';
+}
+
+function tmActivateBar(canvas, e, edgeId, mode, which) {
+  var edge = tmEdgeById(edgeId);
+  if (!edge) return;
+  var start = tmCanvasPoint(e.clientX, e.clientY);
+  TM.bar = {
+    edgeId: edgeId, pointerId: e.pointerId, mode: mode, end: which,
+    start: start, moved: false, snapped: '', bent: tmEdgeBend(edge),
+    prevSelected: TM.selectedEdge
+  };
+  if (mode === 'move') TM.selectedEdge = edgeId;
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+  if (navigator.vibrate) { try { navigator.vibrate(8); } catch (err) {} }
+}
+
+function tmCancelBar() {
+  TM.bar = null;
+  tmClearSnap();
+}
+
+// Live update of the bar being dragged: the curve follows the pointer, or the
+// pulled end dangles behind it while a box lights up as the magnet target.
+function tmBarMove(pt) {
+  var bar = TM.bar;
+  var edge = tmEdgeById(bar.edgeId);
+  if (!edge) return;
+  var d = Math.sqrt((pt.x - bar.start.x) * (pt.x - bar.start.x) + (pt.y - bar.start.y) * (pt.y - bar.start.y));
+  if (d * TM.zoom > 6) bar.moved = true;
+
+  var a = tmNodeBox(edge.from), b = tmNodeBox(edge.to);
+  var acx = a.x + a.w / 2, acy = a.y + a.h / 2;
+  var bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
+  var dx = bcx - acx, dy = bcy - acy;
+  var len = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+  var ux = dx / len, uy = dy / len;
+  var mx = (acx + bcx) / 2, my = (acy + bcy) / 2;
+
+  if (bar.mode === 'move') {
+    if (!bar.moved) return;
+    // Reference geometry from the bend the bar had when the drag started, so
+    // the very first pixel of movement does not jump.
+    var geo = tmEdgeGeometry(a, b, edge.style, bar.bent);
+    var nx = -uy, ny = ux;
+    // The chip sits at half the control offset (quadratic midpoint weighting),
+    // so a chip move of d needs a bend move of 2d. The chord's own offset
+    // cancels out because the box exits sit along the chord direction.
+    var off0 = 2 * ((geo.mid.x - mx) * nx + (geo.mid.y - my) * ny);
+    var p0 = (bar.start.x - mx) * nx + (bar.start.y - my) * ny;
+    var p1 = (pt.x - mx) * nx + (pt.y - my) * ny;
+    var bend = Math.max(-260, Math.min(260, off0 + 2 * (p1 - p0)));
+    if (Math.abs(bend) < 6) bend = 0;
+    edge.bend = bend;
+    tmRenderEdgesSoon();
+    return;
+  }
+
+  // Pulling an end: the end follows the pointer, and the nearest box that
+  // could receive it lights up.
+  if (!bar.moved) return;
+  var other = (bar.end === 'from') ? edge.to : edge.from;
+  var snap = tmSnapNodeAt(pt, [other]);
+  var current = (bar.end === 'from') ? edge.from : edge.to;
+  tmShowSnap(snap && snap !== current ? snap : '');
+  var handles = document.querySelectorAll('.tm-edge-handle');
+  var handle = handles[(bar.end === 'from') ? 0 : 1];
+  if (handle) { handle.style.left = pt.x + 'px'; handle.style.top = pt.y + 'px'; }
+  bar.snapped = (snap && snap !== current) ? snap : '';
+
+  // The fixed end stays put; a dashed cord shows where the pulled end is going.
+  var visible = document.querySelector('.tm-edge[data-edge="' + edge.id + '"]');
+  if (visible) visible.style.opacity = '.18';
+  var dangle = $t('tm-edge-dangle');
+  if (!dangle) {
+    dangle = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    dangle.setAttribute('id', 'tm-edge-dangle');
+    dangle.setAttribute('class', 'tm-edge-dangle');
+    var svgLayer = $t('tm-edge-layer');
+    if (svgLayer) svgLayer.appendChild(dangle);
+  }
+  var fixed = (bar.end === 'from') ? geo.end : geo;
+  if (dangle) {
+    dangle.setAttribute('d', 'M' + fixed.x + ',' + fixed.y + ' L' + pt.x + ',' + pt.y);
+  }
+}
+
+// What a released bar does: a tap selects (or deselects) it, a bend drag
+// persists the new shape, and a pulled end re-points the link — the backend
+// validates that the new link is legal before anything is kept.
+async function tmBarDrop() {
+  var bar = TM.bar;
+  if (!bar) return;
+  var edge = tmEdgeById(bar.edgeId);
+  var snap = bar.snapped;
+  TM.bar = null;
+  tmClearSnap();
+  if (!edge) { tmRenderEdges(); return; }
+
+  if (!bar.moved) {
+    // A tap: select the bar (or deselect it when it already was).
+    TM.selectedEdge = (bar.prevSelected === edge.id) ? '' : edge.id;
+    tmRenderEdges();
+    return;
+  }
+
+  if (!bar.end) {
+    // Bending changes no topology, only the drawing: save and be done.
+    await tmSaveGraph({});
+    tmRenderEdges();
+    return;
+  }
+
+  if (!snap) { tmRenderEdges(); return; }   // the end went nowhere near a box
+
+  var wasFrom = edge.from, wasTo = edge.to;
+  if (bar.end === 'from') edge.from = snap;
+  else edge.to = snap;
+  if (!(await tmValidateEdges(t('tm.destChanged')))) {
+    edge.from = wasFrom;
+    edge.to = wasTo;
+    tmRenderEdges();
+    return;
+  }
+  await tmSaveGraph({});
+  tmRenderGraph();
+  toast(t('tm.destChanged'), 'ok');
+  tmScheduleApply(0);
+}
+
+function tmActivateDrag(canvas, e) {
+  if (!TM.press || TM.press.activated) return;
+  TM.press.activated = true;
+  if (!tmServerById(TM.press.nodeId)) { tmCancelPress(); return; }
+  var el = document.querySelector('.tm-node[data-node="' + TM.press.nodeId + '"]');
+  if (el) el.classList.add('dragging');
+  TM.drag = TM.press;
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+  if (navigator.vibrate) { try { navigator.vibrate(12); } catch (err) {} }
+}
+
+function tmCancelPress() {
+  if (TM.press && TM.press.timer) clearTimeout(TM.press.timer);
+  TM.press = null;
+}
+
+function tmPointerMove(e) {
+  if (TM.pointers[e.pointerId]) TM.pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+
+  if (TM.pinch && Object.keys(TM.pointers).length >= 2) {
+    var ids = Object.keys(TM.pointers);
+    var a = TM.pointers[ids[0]], b = TM.pointers[ids[1]];
+    var dist = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+    var canvas = $t('tm-canvas');
+    var r = canvas.getBoundingClientRect();
+    tmZoom((a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top, (TM.pinch.zoom * (dist / TM.pinch.dist)) / TM.zoom);
+    return;
+  }
+
+  // A bar is being carried: bend it, or pull one of its ends onto a box.
+  if (TM.bar && TM.bar.pointerId === e.pointerId) {
+    tmBarMove(tmCanvasPoint(e.clientX, e.clientY));
+    return;
+  }
+
+  if (TM.drag && TM.drag.pointerId === e.pointerId) {
+    var pt = tmCanvasPoint(e.clientX, e.clientY);
+    var srv = tmServerById(TM.drag.nodeId);
+    if (!srv) return;
+    srv.x = Math.max(-400, Math.min(4000, TM.drag.originX + (pt.x - TM.drag.startX)));
+    srv.y = Math.max(-400, Math.min(4000, TM.drag.originY + (pt.y - TM.drag.startY)));
+    var el = document.querySelector('.tm-node[data-node="' + TM.drag.nodeId + '"]');
+    if (el) el.style.transform = 'translate(' + Math.round(srv.x) + 'px,' + Math.round(srv.y) + 'px)';
+    tmRenderEdgesSoon();
+    return;
+  }
+
+  if (TM.press && TM.press.pointerId === e.pointerId) {
+    var now = tmCanvasPoint(e.clientX, e.clientY);
+    var dx = now.x - TM.press.startX, dy = now.y - TM.press.startY;
+    // Screen-space threshold, so a zoomed-out canvas is not jittery and a
+    // zoomed-in one still lets a deliberate slide start a node drag.
+    var threshold = 16 / Math.max(0.5, TM.zoom);
+    if (Math.sqrt(dx * dx + dy * dy) > threshold) {
+      // Moved before the long press fired: this was a pan, not a node drag.
+      if (TM.press.timer) clearTimeout(TM.press.timer);
+      TM.press = null;
+      TM.pan = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, panX: TM.panX, panY: TM.panY };
+      var canvasEl = $t('tm-canvas');
+      if (canvasEl) canvasEl.classList.add('grabbing');
+    }
+    return;
+  }
+
+  if (TM.pan && TM.pan.pointerId === e.pointerId) {
+    TM.panX = TM.pan.panX + (e.clientX - TM.pan.x);
+    TM.panY = TM.pan.panY + (e.clientY - TM.pan.y);
+    tmApplyTransform();
+  }
+}
+
+function tmPointerUp(e) {
+  delete TM.pointers[e.pointerId];
+  if (Object.keys(TM.pointers).length < 2) TM.pinch = null;
+
+  if (TM.bar && TM.bar.pointerId === e.pointerId) {
+    // A cancelled gesture must not leave a half-pulled bar or a stale cord.
+    if (e.type === 'pointercancel') {
+      var cancelled = tmEdgeById(TM.bar.edgeId);
+      if (cancelled) cancelled.bend = TM.bar.bent;
+      tmCancelBar();
+      tmRenderEdges();
+      return;
+    }
+    tmBarDrop();
+    return;
+  }
+
+  if (TM.drag && TM.drag.pointerId === e.pointerId) {
+    var el = document.querySelector('.tm-node[data-node="' + TM.drag.nodeId + '"]');
+    if (el) el.classList.remove('dragging');
+    TM.drag = null;
+    TM.press = null;
+    tmPersistPositionsSoon();
+    return;
+  }
+
+  if (TM.press && TM.press.pointerId === e.pointerId) {
+    var wasActivated = TM.press.activated;
+    if (TM.press.timer) clearTimeout(TM.press.timer);
+    var nodeId = TM.press.nodeId;
+    TM.press = null;
+    if (!wasActivated) {
+      if (e.type !== 'pointercancel') {
+        // A plain tap opens the node's own controls (name, ping, Edit, Set).
+        // Linking is done with the two keys, never with the body of the box.
+        TM.openNode = (TM.openNode === nodeId) ? '' : nodeId;
+        tmRenderGraph();
+        tmArmNodeTimer();
+      }
+    }
+    return;
+  }
+
+  if (TM.pan && TM.pan.pointerId === e.pointerId) {
+    TM.pan = null;
+    var canvas = $t('tm-canvas');
+    if (canvas) canvas.classList.remove('grabbing');
+  }
+}
+
+// ─── Validate / Apply / Generate ────────────────────────────────────────────
+// ─── Automatic apply ────────────────────────────────────────────────────────
+// There is no Apply button: any accepted change to the graph is saved and then
+// pushed to the servers by itself. Edits are coalesced, so dragging a box or
+// finishing a chain produces exactly one push.
+var TM_APPLY_TIMER = null;
+var TM_APPLY_RUNNING = false;
+
+function tmSetAutoState(kind, text) {
+  var el = $t('tm-auto-state');
+  if (!el) return;
+  el.classList.remove('busy', 'err');
+  if (kind) el.classList.add(kind);
+  var label = el.querySelector('span:last-child');
+  if (label) label.textContent = text;
+}
+
+function tmScheduleApply(delay) {
+  clearTimeout(TM_APPLY_TIMER);
+  TM_APPLY_TIMER = setTimeout(function () { tmAutoApply(); }, delay == null ? 900 : delay);
+}
+
+async function tmAutoApply() {
+  if (TM_APPLY_RUNNING) { tmScheduleApply(1200); return; }
+  if (!TM.edges.length && !TM.activeServer) return;
+  TM_APPLY_RUNNING = true;
+  tmSetAutoState('busy', t('tm.applying'));
+  try {
+    await tmSaveGraph({});
+    var r = await api('/api/tm/apply', { method: 'POST', body: {} });
+    if (r.ok) {
+      TM.appliedChain = r.chain || [];
+      TM.appliedEdges = TM.edges.slice();
+      tmSetAutoState('', t('tm.autoDone'));
+      tmRenderProgress(r.steps);
+      tmGenerate();
+      // A change to the chain invalidates the per-link numbers that were
+      // measured against the previous chain.
+      tmClearEdgePings();
+    } else {
+      tmSetAutoState('err', t('tm.applyFailed'));
+      tmRenderProgress(r.steps);
+      toast(r.error || t('tm.applyFailed'), 'err');
+    }
+    await loadTM();
+  } catch (e) {
+    tmSetAutoState('err', t('tm.applyFailed'));
+    toast(e.message || t('tm.applyFailed'), 'err');
+  }
+  TM_APPLY_RUNNING = false;
+}
+
+function tmClearEdgePings() {
+  TM.edgePings = {};
+  TM.edgePingAt = {};
+  tmRenderEdges();
+}
+
+// The progress list stays as a short, self-expiring report of the last push.
+function tmRenderProgress(steps) {
+  var el = $t('tm-progress');
+  if (!el) return;
+  if (!steps || !steps.length) { el.classList.remove('show'); el.innerHTML = ''; return; }
+  el.classList.add('show');
+  el.innerHTML = steps.map(function (s) {
+    var cls = s.ok ? 'ok' : 'fail';
+    var icon = s.ok ? 'check_circle' : 'error';
+    return '<div class="tm-progress-step ' + cls + '"><span class="material-symbols-outlined">' + icon + '</span><span>' + esc(s.label) + '</span></div>';
+  }).join('');
+  clearTimeout(TM.progressTimer);
+  TM.progressTimer = setTimeout(function () {
+    el.classList.remove('show');
+    el.innerHTML = '';
+  }, 9000);
+}
+
+async function tmGenerate() {
+  var pre = $t('tm-config-preview');
+  if (!pre) return;
+  if (!TM.servers.length) { pre.textContent = t('tm.noServers'); return; }
+  try {
+    var r = await api('/api/tm/generate', { method: 'POST', body: { node_id: TM.activeServer } });
+    pre.textContent = r.ok ? r.config : (r.error || '—');
+  } catch (e) { pre.textContent = e.message || '—'; }
+}
+
+function tmCopyConfig() {
+  var pre = $t('tm-config-preview');
+  if (!pre || !pre.textContent) return;
+  var txt = pre.textContent;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(function () { toast(t('copyOk') || 'Copied', 'ok'); })
+      .catch(function () { toast(t('toast.err'), 'err'); });
+  } else { toast(t('toast.err'), 'err'); }
+}
+
+// ─── Wiring ─────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+  tmBindCanvas();
+});
+setTimeout(function () { tmBindCanvas(); }, 0);
 
 // Login form submit
 var loginFormEl = $id('login-form');

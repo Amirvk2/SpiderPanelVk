@@ -60,6 +60,16 @@ _sys.modules.setdefault("main", _sys.modules[__name__])
 # Telegram Web Proxy (TWP): framing, MTProxy crypto, signing key and relay.
 import twp as _twp
 
+# Tunnel Management (TM): multi-server tunnel-chain control plane. It owns the
+# graph overlay, the topology/role/route algorithm and the TM inbound; it reuses
+# the Node storage, the API-key channel and the VLESS relay pipeline that are
+# already defined here. Imported after the `main` alias above so its lazy
+# `sys.modules["main"]` lookups always resolve to THIS module.
+import tm as _tm
+
+_tm_load_state = _tm.load_state
+_tm_dump_state = _tm.dump_state
+
 IRAN_TZ = ZoneInfo("Asia/Tehran")
 
 app = FastAPI(title="Spider Gateway", docs_url=None, redoc_url=None)
@@ -318,6 +328,9 @@ async def load_state():
                 WORKER.update(data["worker"])
                 if was_connected:
                     WORKER["connected"] = True
+            # Tunnel Management: the graph overlay is restored as-is; the
+            # servers it points at are the ordinary Node records loaded above.
+            _tm_load_state(data.get("tm"))
             logger.info(f"State loaded: {len(LINKS)} links, {len(SUBS)} subs, {len(USERS)} users, {len(GROUPS)} groups, {len(IP_POOL)} ips, {len(INBOUNDS)} inbounds, {len(NODES)} nodes")
     except Exception as e:
         logger.warning(f"Could not load state: {e}")
@@ -458,6 +471,9 @@ async def save_state():
                 "bot_orders": dict(BOT_ORDERS),
                 "proxies": dict(PROXIES),
                 "web_proxy_secrets": {k: dict(v) for k, v in WEB_PROXY_SECRETS.items()},
+                # Tunnel Management owns only its graph overlay here; the server
+                # credentials and health live in `nodes` like every other Node.
+                "tm": _tm_dump_state(),
                 "password_hash": AUTH["password_hash"],
                 "saved_secret": CONFIG["secret"],
                 "saved_at": datetime.now().isoformat(),
@@ -518,6 +534,7 @@ SETTINGS = {
     "websocket_mode": True,
     "xhttp_mode": True,
     "default_connection_mode": "ws",  # ws, xhttp, tcp
+    "default_tls_ws_ech_preset": "cf-config",
     "max_ip_per_user": 3,
     "bandwidth_limit_mbps": 100,
     "live_monitoring": True,
@@ -1577,6 +1594,14 @@ async def startup():
     # inbound block below (it takes INBOUNDS_LOCK itself).
     await ensure_web_proxy_inbound()
     asyncio.create_task(_twp_session_sweeper(), name="spider-twp-sessions")
+    # Built-in TM inbound: created once on a fresh install, adopted in place
+    # afterwards. It is a real inbound that takes part in config generation, so
+    # it must exist before any inbound-dependent setup below.
+    try:
+        await _tm.ensure_tm_inbound()
+        await _tm.sync_tm_inbound_nodes()
+    except Exception as e:
+        logger.warning(f"TM inbound bootstrap failed: {e}")
     # Ensure the exact default TLS+WS inbound exists. It is the ONLY inbound
     # served by the FastAPI /ws/{uuid} relay.
     retired_http_ws = False
@@ -1980,11 +2005,13 @@ async def startup():
         except Exception as e:
             logger.warning(f"Xray apply on boot failed: {e}")
     log_activity("system", "سرور راه‌اندازی شد", "ok")
-    logger.info(f"Spider Panel v10 (commit 24d7594) started on port {CONFIG['port']}")
+    logger.info(f"Spider Panel v11 started on port {CONFIG['port']}")
     # Include XHTTP router for xhttp-siz10 endpoints (already merged into main.py)
     global xhttp_router
     # router is already defined in this module
     app.include_router(router)
+    # Tunnel Management API (server management, graph, validation, apply, status)
+    app.include_router(_tm.router)
     global PUBLIC_ENDPOINT_TASK
     if PUBLIC_ENDPOINT_TASK is None or PUBLIC_ENDPOINT_TASK.done():
         PUBLIC_ENDPOINT_TASK = asyncio.create_task(_public_endpoint_resolver_loop())
@@ -2684,13 +2711,16 @@ def is_default_tls_ws_inbound(inbound: dict | None) -> bool:
 def _is_panel_relay_inbound(iid: str, ib: dict | None) -> bool:
     """True when the FastAPI relay itself accepts traffic for this inbound.
 
-    Covers the managed TLS/WS inbound and the Worker-tab Tunnel and Reverse
-    inbounds. Proxy-managed inbounds have their own per-proxy links.
-    Reality/Xray and Telegram inbounds are NOT served by the relay.
+    Covers the managed TLS/WS inbound, the Worker-tab Tunnel and Reverse
+    inbounds and the TM inbound. Proxy-managed inbounds have their own
+    per-proxy links. Reality/Xray and Telegram inbounds are NOT served by the
+    relay.
     """
     if not ib:
         return False
     if is_default_tls_ws_inbound(ib):
+        return True
+    if _tm.is_tm_inbound(ib):
         return True
     return str(ib.get("protocol") or "").lower() in ("tunnel", "reverse")
 
@@ -2852,6 +2882,28 @@ def node_subscription_configs(user: dict) -> list[str]:
     return out
 
 
+def _tm_subscription_configs(user: dict, inbound_ids=None) -> list[str]:
+    """Every TM config a user should get: one per entry server, one per Set.
+
+    The TM inbound is a management selector like Node; the difference is that a
+    chain can have several working entries (a balancer with parallel fronts), so
+    the subscription carries a config for each of them instead of one door.
+    Everything is generated for the user's own config UUID.
+    """
+    tm_iid = _tm.find_tm_inbound_id()
+    selected = set(inbound_ids or user.get("inbound_ids") or [])
+    if not tm_iid or tm_iid not in selected:
+        return []
+    cfgs = _tm.tm_client_configs(user)
+    out, seen = [], set()
+    for cfg in cfgs:
+        cfg = str(cfg).strip()
+        if cfg and cfg not in seen:
+            out.append(cfg)
+            seen.add(cfg)
+    return out
+
+
 def generate_uuid() -> str:
     """Generate a standard hyphenated UUID (RFC 4122) — required by VLESS clients
     and the worker's uuid validation (the worker rejects 32-char bare hex)."""
@@ -2872,6 +2924,22 @@ _FF_CIPHER_SUITES = (
 # per field; clients re-parsing this JSON expect that exact layout.
 _SPOOF_DEFAULT_SNI = "chatgpt.com"
 _SPOOF_DEFAULT_IP = "1.2.3.4"
+
+# ECH values accepted by the Help > Config Options picker. Store the short
+# preset key in settings and resolve it here, rather than trusting arbitrary
+# strings from the browser in generated client configuration links.
+_ECH_PRESETS = {
+    "cf-config": "AEX+DQBBXgAgACBsvLac2HVdvp+J2QTKPNjn24b5D6yHyxAcG0m+cmDcXAAEAAEAAQASY2xvdWRmbGFyZS1lY2guY29tAAA=",
+    "crypto-cloudflare": "crypto.cloudflare.com+udp://8.8.8.8",
+    "ridanbe": "ridanbe.net+udp://8.8.8.8",
+    "iranva": "iranva.ir+udp://1.1.1.1",
+}
+_DEFAULT_ECH_PRESET = "cf-config"
+
+
+def _selected_ech_preset() -> str:
+    preset = str(SETTINGS.get("default_tls_ws_ech_preset") or _DEFAULT_ECH_PRESET).strip()
+    return preset if preset in _ECH_PRESETS else _DEFAULT_ECH_PRESET
 
 
 def _spoof_payload(fake_sni: str, spoof_ip: str) -> str:
@@ -2898,7 +2966,8 @@ def _ws_fingerprint(is_default_tls_ws: bool) -> str:
 def _default_tls_ws_feature_params() -> str:
     params = []
     if SETTINGS.get("default_tls_ws_ech_enabled"):
-        params.append("ech=" + quote("cloudflare-ech.com+udp://1.1.1.1", safe=""))
+        ech_value = _ECH_PRESETS[_selected_ech_preset()]
+        params.append("ech=" + quote(ech_value, safe=""))
     if SETTINGS.get("default_tls_ws_ff_enabled"):
         fragment = {
             "tcp": [
@@ -3255,6 +3324,16 @@ def generate_user_config(user_id: str, user: dict, inbound_id: str = None, addr:
     # ── TLS (WS default / XHTTP selectable) — served by the FastAPI relay ──
     # address/host/sni always = the panel main domain; port 443 (Railway TLS).
     panel_domain = _safe_host(SETTINGS.get("domain"), get_host())
+
+    # ── TM (Tunnel Management) — the client dials the server whose graph role
+    # marks it as the entry of the active chain, with its own ws/TM(/ws/nextTM)
+    # route. The TM inbound is a real inbound: when a user selected it, this is
+    # the config they get. The same config UUID flows through every hop.
+    if proto == _tm.TM_PROTOCOL:
+        cfg = _tm.tm_client_config(user)
+        if cfg:
+            return cfg
+        return ""
 
     # ── REVERSE (user → Worker → Railway → site) — its own inbound, path
     # /reverse/{uuid}, addressed to the WORKER domain so the client dials CF first.
@@ -3970,7 +4049,7 @@ TGProxy = MTProtoProxyServer
 
 @app.get("/")
 async def root():
-    return {"service": "Spider Gateway", "version": "10.1", "status": "active"}
+    return {"service": "Spider Gateway", "version": "11.0", "status": "active"}
 
 
 @app.get("/healthz")
@@ -4120,6 +4199,14 @@ async def _build_subscription_data_by_uuid(config_uuid: str):
     # Node is a management selector; its public configs come from the exact
     # existing `پیش‌فرض TLS + WS` inbound on each selected remote panel.
     configs.extend(node_subscription_configs(user))
+
+    # TM is a management selector too, but a chain can have more than one front
+    # door: every entry server and every Set server gets its own config, all on
+    # the same user UUID, so a dead entry does not take the subscription with it.
+    try:
+        configs.extend(_tm_subscription_configs(user, inbound_ids))
+    except Exception as exc:
+        logger.warning("TM subscription configs failed user=%s: %s", user.get("username", uid), exc)
 
     if not configs:
         fallback_iid = find_default_tls_ws_inbound_id()
@@ -5203,7 +5290,27 @@ async def ws_uuid_handler(ws: WebSocket, uuid: str):
     if uuid == "live":
         await websocket_live_stats(ws)
         return
+    # The TM route templates /ws/TM/{uuid} and /ws/nextTM/{uuid} must never be
+    # served as the plain managed relay (a TM client would exit on the wrong
+    # server). A bare /ws/TM or /ws/nextTM is a truncated TM path; reject it
+    # rather than treating "TM" as a config_uuid.
+    if uuid in ("TM", "nextTM"):
+        await ws.close(code=1008, reason="invalid TM path")
+        return
     await websocket_tunnel(ws, uuid, expected_relay_inbound_id=find_default_tls_ws_inbound_id())
+
+
+# Tunnel Management: /ws/TM/{uuid} — the user enters THIS server as a TM hop.
+# TM is routed BEFORE the plain /ws/{uuid} template handler so the dedicated
+# paths cannot be mistaken for the managed relay.
+@app.websocket("/ws/TM/{uuid}")
+async def tm_ws_handler(ws: WebSocket, uuid: str):
+    await _tm.tm_ws_entry(ws, uuid, hop=False)
+
+
+@app.websocket("/ws/nextTM/{uuid}")
+async def tm_next_ws_handler(ws: WebSocket, uuid: str):
+    await _tm.tm_ws_entry(ws, uuid, hop=True)
 
 
 # Tunnel path: /tunnel/{uuid} — user → Railway (here) → Cloudflare Worker → site.
@@ -7095,6 +7202,10 @@ async def get_user_subscription(user_id: str, _=Depends(require_auth)):
         if cfg:
             configs.append(cfg)
     configs.extend(node_subscription_configs(u))
+    try:
+        configs.extend(_tm_subscription_configs(u, selected_ids))
+    except Exception as exc:
+        logger.warning("TM subscription configs failed user=%s: %s", u.get("username", user_id), exc)
     if not configs:
         fallback_iid = find_default_tls_ws_inbound_id() if find_default_tls_ws_inbound_id() in selected_ids else (u.get("inbound_id") if u.get("inbound_id") and not is_node_control_inbound(u.get("inbound_id")) else None)
         cfg = generate_user_config(user_id, u, fallback_iid) if fallback_iid else ""
@@ -7523,6 +7634,7 @@ async def get_help_settings(_=Depends(require_auth)):
             "address_override": str(SETTINGS.get("default_tls_ws_address_override") or ""),
             "address_mode": str(SETTINGS.get("default_tls_ws_address_mode") or "panel"),
             "ech_enabled": bool(SETTINGS.get("default_tls_ws_ech_enabled")),
+            "ech_preset": _selected_ech_preset(),
             "ff_enabled": bool(SETTINGS.get("default_tls_ws_ff_enabled")),
             "spoof_enabled": bool(SETTINGS.get("default_tls_ws_spoof_enabled")),
             "spoof_sni": str(SETTINGS.get("default_tls_ws_spoof_sni") or _SPOOF_DEFAULT_SNI),
@@ -7552,6 +7664,11 @@ async def update_help_settings(request: Request, _=Depends(require_auth)):
             SETTINGS["default_tls_ws_address_mode"] = mode
         if "ech_enabled" in body:
             SETTINGS["default_tls_ws_ech_enabled"] = bool(body["ech_enabled"])
+        if "ech_preset" in body:
+            ech_preset = str(body.get("ech_preset") or "").strip()
+            if ech_preset not in _ECH_PRESETS:
+                raise HTTPException(status_code=400, detail="Unknown ECH preset")
+            SETTINGS["default_tls_ws_ech_preset"] = ech_preset
         if "ff_enabled" in body:
             SETTINGS["default_tls_ws_ff_enabled"] = bool(body["ff_enabled"])
         if "spoof_enabled" in body:
@@ -7566,6 +7683,7 @@ async def update_help_settings(request: Request, _=Depends(require_auth)):
             "address_override": str(SETTINGS.get("default_tls_ws_address_override") or ""),
             "address_mode": str(SETTINGS.get("default_tls_ws_address_mode") or "panel"),
             "ech_enabled": bool(SETTINGS.get("default_tls_ws_ech_enabled")),
+            "ech_preset": _selected_ech_preset(),
             "ff_enabled": bool(SETTINGS.get("default_tls_ws_ff_enabled")),
             "spoof_enabled": bool(SETTINGS.get("default_tls_ws_spoof_enabled")),
             "spoof_sni": str(SETTINGS.get("default_tls_ws_spoof_sni") or _SPOOF_DEFAULT_SNI),
@@ -8427,7 +8545,7 @@ async def add_node(request: Request, _=Depends(require_auth)):
     domain = _normalize_node_base_url(body.get("domain") or body.get("url") or "")
     raw_api_key = str(body.get("api_key") or body.get("spi_key") or "").strip()
     if not raw_api_key or not raw_api_key.startswith("spdr_"):
-        raise HTTPException(status_code=400, detail="SPI Key باید با spdr_ شروع شود")
+        raise HTTPException(status_code=400, detail="API Key باید با spdr_ شروع شود")
     api_key = _normalize_node_key(raw_api_key)
     name = str(body.get("name") or "").strip()[:60]
     if not domain:
@@ -8478,12 +8596,12 @@ async def update_node(node_id: str, request: Request, _=Depends(require_auth)):
     domain = _normalize_node_base_url(body.get("domain") if "domain" in body else current.get("domain"))
     raw_api_key = str(body.get("api_key") or "").strip()
     if raw_api_key and not raw_api_key.startswith("spdr_"):
-        raise HTTPException(status_code=400, detail="SPI Key باید با spdr_ شروع شود")
+        raise HTTPException(status_code=400, detail="API Key باید با spdr_ شروع شود")
     api_key = _normalize_node_key(raw_api_key if raw_api_key else current.get("api_key"))
     if not domain:
         raise HTTPException(status_code=400, detail="دامنه نود معتبر نیست")
     if not api_key.startswith("spdr_"):
-        raise HTTPException(status_code=400, detail="SPI Key باید با spdr_ شروع شود")
+        raise HTTPException(status_code=400, detail="API Key باید با spdr_ شروع شود")
     current.update({"name": name, "domain": domain, "url": domain, "api_key": api_key, "status": "checking"})
     probe = await _probe_node(current)
     if probe.get("status") != "online":
@@ -9855,7 +9973,7 @@ async def node_identity(request: Request):
     return {
         "ok": True, "host": host, "ip": ident.get("ip", ""), "flag": ident.get("flag", ""),
         "country_code": ident.get("country_code", ""), "country": ident.get("country_name", ""),
-        "users": users, "version": "10.0",
+        "users": users, "version": "11.0",
         "default_tls_ws": {
             "id": default_iid or "", "name": default_ib.get("name", ""),
             "domain": default_ib.get("domain") or host,
