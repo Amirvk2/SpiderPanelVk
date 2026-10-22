@@ -1,17 +1,14 @@
 <div align="center">
-  <img src="svg/hero.svg" alt="SpiderPanel — control panel hero" width="100%" />
+  <img src="svg/hero.svg" alt="SpiderPanel — modern control panel and network operations" width="100%" />
 
   <p>
-    <b>Modern Xray control panel for subscriptions, nodes, scanners and Telegram automation.</b><br>
-    Built around a responsive web UI with a fixed panel port <code>8080</code>.
+    <a href="https://github.com/amirh00sain/SpiderPanel"><img alt="GitHub repository" src="https://img.shields.io/badge/GitHub-SpiderPanel-171018?style=for-the-badge&logo=github&logoColor=white"></a>
+    <img alt="Python" src="https://img.shields.io/badge/Python-3.x-171018?style=for-the-badge&logo=python&logoColor=ff697b">
+    <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-API-171018?style=for-the-badge&logo=fastapi&logoColor=75e3f7">
+    <img alt="Panel port" src="https://img.shields.io/badge/PANEL_PORT-8080-171018?style=for-the-badge&labelColor=171018&color=ed3854">
   </p>
-
-  <p>
-    <a href="https://github.com/amirh00sain/SpiderPanel"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-SpiderPanel-111111?style=for-the-badge&logo=github&logoColor=white"></a>
-    <img alt="Python" src="https://img.shields.io/badge/Python-3.x-111111?style=for-the-badge&logo=python&logoColor=white">
-    <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-API-111111?style=for-the-badge&logo=fastapi&logoColor=white">
-    <img alt="Port" src="https://img.shields.io/badge/PORT-8080-8b5cf6?style=for-the-badge">
-  </p>
+  <p><b>Manage users, subscriptions, nodes, scanners and Telegram workflows from one control panel.</b></p>
+  <p>VPS · Railway · Docker-oriented deployment · Responsive UI</p>
 </div>
 
 ---
@@ -19,6 +16,7 @@
 <details>
 <summary><b>📚 Table of contents</b></summary>
 
+- [Animated network map](#-animated-network-map)
 - [Why SpiderPanel?](#-why-spiderpanel)
 - [Deployment](#-deployment)
 - [Public endpoint & subscription flow](#-public-endpoint--subscription-flow)
@@ -28,12 +26,25 @@
 - [Nodes & workers](#-nodes--workers)
 - [Project structure](#-project-structure)
 - [Runtime & API](#-runtime--api)
+- [Built-in Web Proxy](#-built-in-web-proxy-inbound-telegram-web-proxy)
+- [Vercel Domain relay](#vercel-domain-tls--websocket-relay)
 - [UI details](#-ui-details)
 - [Security notes](#-security-notes)
 - [Development](#-development)
 - [مستندات فارسی](#-مستندات-فارسی)
 
 </details>
+
+## 🌐 Animated network map
+
+<div align="center">
+  <img src="svg/network-map.svg" alt="Animated illustrative 3D network globe with flowing routes and glowing nodes" width="100%" />
+  <sub><b>Animated topology artwork.</b> Route paths are illustrative; this graphic does not display live server telemetry.</sub>
+</div>
+
+The globe gives the README a visual network overview. Its routes and node pulses are decorative animations, not a source of live traffic, server health or geolocation data.
+
+---
 
 ## ✦ Why SpiderPanel?
 
@@ -42,7 +53,7 @@ SpiderPanel brings the operational pieces of a proxy service into one panel: use
 It is designed to be useful both on a direct VPS installation and on container/deployer environments where the public hostname may not be known until runtime.
 
 <div align="center">
-  <img src="svg/features.svg" alt="SpiderPanel feature overview" width="100%" />
+  <img src="svg/features.svg" alt="SpiderPanel feature overview — users, subscriptions, scanner, nodes, Telegram and runtime" width="100%" />
 </div>
 
 ### Core capabilities
@@ -63,7 +74,7 @@ It is designed to be useful both on a direct VPS installation and on container/d
 # 🚀 Deployment
 
 <div align="center">
-  <img src="svg/deploy.svg" alt="SpiderPanel deployment flow" width="100%" />
+  <img src="svg/deploy.svg" alt="SpiderPanel deployment flow: repository, build, port and panel" width="100%" />
 </div>
 
 ## Option A — One-command VPS install
@@ -205,7 +216,7 @@ The mobile UI is tuned for compact, touch-friendly results so a domain or IP can
 Node and worker tooling includes health checks, refresh/sync operations, worker setup and heartbeat/health helpers.
 
 <div align="center">
-  <img src="svg/architecture.svg" alt="SpiderPanel architecture" width="100%" />
+  <img src="svg/architecture.svg" alt="SpiderPanel high-level architecture with animated signal paths" width="100%" />
 </div>
 
 At a high level:
@@ -248,6 +259,7 @@ FastAPI application
 ├── svg/                    # README / project SVG artwork
 │   ├── logo.svg
 │   ├── hero.svg
+│   ├── network-map.svg      # animated illustrative 3D globe
 │   ├── features.svg
 │   ├── deploy.svg
 │   └── architecture.svg
@@ -381,7 +393,7 @@ SpiderPanel's interface is built around:
 - Telegram glass-button style flows
 - desktop + mobile layouts
 
-The `svg/` directory contains the original documentation artwork used by this README. They are intentionally standalone SVG files so the repository can keep its visual identity without relying on raster screenshots.
+The `svg/` directory contains standalone documentation artwork: an animated hero, illustrative 3D network globe, feature overview, deployment flow, architecture diagram and wordmark. Animations have static visual fallbacks and respect reduced-motion preferences in SVG-capable viewers. The globe is a visual illustration, not a live traffic or geolocation feed.
 
 ---
 
@@ -433,7 +445,7 @@ For production or public subscriptions, use the real public hostname rather than
   <img src="svg/logo.svg" alt="SpiderPanel logo" width="360" />
 
   <h3>SPiDER PANEL</h3>
-  <p><i>Deploy fast. Manage cleanly. Keep every configuration within reach.</i></p>
+  <p><i>Connect the pieces. Keep the whole panel in view.</i></p>
 </div>
 
 ---
@@ -447,7 +459,12 @@ For production or public subscriptions, use the real public hostname rather than
 **SpiderPanel** یک پنل مدیریتی برای مدیریت کاربران، اشتراک‌ها، کانفیگ‌ها، نودها، اسکنرها و اتوماسیون تلگرام است. رابط کاربری برای دسکتاپ و موبایل طراحی شده و پورت اصلی پنل روی **8080** ثابت است.
 
 <div align="center" dir="ltr">
-  <img src="svg/hero.svg" alt="SpiderPanel" width="100%" />
+  <img src="svg/hero.svg" alt="SpiderPanel — پنل مدیریت شبکه" width="100%" />
+</div>
+
+<div align="center" dir="ltr">
+  <img src="svg/network-map.svg" alt="نمای گرافیکی کروی و متحرک مسیرهای شبکه" width="100%" />
+  <sub>این نقشه یک تصویرسازی متحرک است و دادهٔ ترافیک زنده نمایش نمی‌دهد.</sub>
 </div>
 
 ### امکانات اصلی
@@ -569,7 +586,7 @@ curl -fsSL https://raw.githubusercontent.com/amirh00sain/SpiderPanel/main/start.
 ابزارهای Node و Worker برای Health Check، Refresh، Sync، Setup و Heartbeat در پنل قرار دارند.
 
 <div align="center" dir="ltr">
-  <img src="svg/architecture.svg" alt="Architecture" width="100%" />
+  <img src="svg/architecture.svg" alt="نمای معماری SpiderPanel با مسیرهای متحرک" width="100%" />
 </div>
 
 ساختار کلی:
