@@ -647,3 +647,18 @@ http://127.0.0.1:8080/spider
 <div align="center">
   <img src="svg/logo.svg" alt="SpiderPanel" width="320" />
 </div>
+
+
+## Vercel Domain (TLS + WebSocket relay)
+
+The System accordion includes **Vercel Domain**. It deploys a Node.js WebSocket bridge to a Vercel project. Per-user configs use `security=tls`, `type=ws`, and the path `/ws/vl/{uuid}` on the Vercel production domain. The bridge opens a WSS connection to the same path on the panel's detected public Railway domain. The Vercel token stays server-side in persisted panel state and is never returned by the status API.
+
+Use a Vercel API token with permission to create deployments/projects, manage project protection, and delete the managed project. Ping uses browser-side `fetch` timing to `/_spider-health` from the administrator's own network (four samples); it is not server-side ping or ICMP. Deleting the connection removes the managed Vercel project. Vercel WebSocket function connections end at the configured function maximum duration (300 seconds in this template on compatible Fluid Compute plans), so clients must be able to reconnect.
+
+The relay template lives under `deploy/vercel/`; the Python deploy/delete integration is `vercel_relay.py`. The WebSocket bridge uses Vercel Functions' native WebSocket support and the `ws` package. Older saved XHTTP relay projects are marked as legacy; delete and recreate them to deploy the new `/ws/vl/{uuid}` bridge.
+
+## دامنه Vercel (رله TLS + WebSocket)
+
+در آکاردیون «سیستم»، بخش **Vercel Domain** یک پل WebSocket در Vercel می‌سازد. کانفیگ هر کاربر از `security=tls` و `type=ws` با مسیر `/ws/vl/{uuid}` روی دامنهٔ Production وِرسل استفاده می‌کند؛ پل، اتصال WSS را به همین مسیر روی دامنهٔ عمومی Railway می‌فرستد. توکن Vercel فقط در وضعیت خصوصی سرور ذخیره می‌شود و در API وضعیت برگردانده نمی‌شود.
+
+توکن باید اجازهٔ ساخت Deployment/Project، مدیریت محافظت پروژه و حذف پروژهٔ ساخته‌شده را داشته باشد. پینگ با چهار نمونهٔ `fetch` از مرورگر مدیر به مسیر `/_spider-health` انجام می‌شود؛ بنابراین از اینترنت خود کاربر اندازه‌گیری می‌شود و پینگ ICMP نیست. اتصال WebSocket در Vercel با رسیدن به حداکثر زمان تابع (در این الگو ۳۰۰ ثانیه روی پلن‌های سازگار با Fluid Compute) بسته می‌شود؛ کلاینت باید قابلیت اتصال مجدد داشته باشد. پروژه‌های قدیمی XHTTP به‌عنوان Legacy مشخص می‌شوند؛ برای استفاده از مسیر جدید `/ws/vl/{uuid}` آن‌ها را حذف و دوباره ایجاد کن.

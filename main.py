@@ -57,6 +57,8 @@ import httpx
 import sys as _sys
 _sys.modules.setdefault("main", _sys.modules[__name__])
 
+from vercel_relay import (VercelError, delete_vercel_project, deploy_to_vercel, verify_vercel_token)
+
 # Telegram Web Proxy (TWP): framing, MTProxy crypto, signing key and relay.
 import twp as _twp
 
@@ -322,6 +324,25 @@ async def load_state():
             IP_POOL.extend(data.get("ip_pool", []))
             IP_BLACKLIST.clear()
             IP_BLACKLIST.update(data.get("ip_blacklist", []))
+            if isinstance(data.get("vercel_domain"), dict):
+                _saved_vercel = data["vercel_domain"]
+                VERCEL.update(_saved_vercel)
+                # Saved configurations made by the previous XHTTP relay have no
+                # protocol marker; they must be removed and redeployed because
+                # a Vercel project contains its own immutable relay code.
+                VERCEL["legacy_protocol"] = bool(
+                    VERCEL.get("connected") and str(_saved_vercel.get("protocol") or "").lower() != "ws"
+                )
+                if VERCEL["legacy_protocol"]:
+                    # Keep the legacy marker in persisted state across unrelated
+                    # save_state() calls until the admin deletes/recreates it.
+                    VERCEL["protocol"] = "xhttp"
+                # A deployment lock is process-local and must never survive restart.
+                VERCEL["deploying"] = False
+                # Old/partial state is tolerated, but an incomplete connection
+                # is never exposed as connected to the browser.
+                if not VERCEL.get("token") or not VERCEL.get("project_name") or not VERCEL.get("domain"):
+                    VERCEL["connected"] = False
             if isinstance(data.get("worker"), dict):
                 # Preserve connected=True state from saved state; don't let startup logic reset it.
                 was_connected = data["worker"].get("connected", False)
@@ -466,6 +487,7 @@ async def save_state():
                 "ip_pool": list(IP_POOL),
                 "ip_blacklist": list(IP_BLACKLIST),
                 "worker": dict(WORKER),
+                "vercel_domain": {**VERCEL, "deploying": False},
                 "nodes": dict(NODES),
                 "pending_node_deletions": dict(PENDING_NODE_DELETIONS),
                 "bot_orders": dict(BOT_ORDERS),
@@ -708,6 +730,28 @@ WORKER: dict = {
 WORKER_LOCK = asyncio.Lock()
 # Serialize source syncs (hourly loop + manual button can't overlap).
 WORKER_SYNC_LOCK = asyncio.Lock()
+
+# ── Vercel TLS + WebSocket relay ────────────────────────────────────────────
+# The token is server-side only. New Vercel configs use /ws/vl/{uuid}; older
+# saved projects are flagged as legacy so they can be deleted and recreated.
+VERCEL: dict = {
+    "connected": False,
+    "deploying": False,
+    "token": "",
+    "project_name": "",
+    "domain": "",
+    "url": "",
+    "target_domain": "",
+    "deploy_id": "",
+    "project_id": "",
+    "relay_path": "/ws/vl",
+    "public_path": "/ws/vl",
+    "protocol": "ws",
+    "legacy_protocol": False,
+    "created_at": "",
+    "last_error": "",
+}
+VERCEL_LOCK = asyncio.Lock()
 
 # ── Telegram Bot automation ─────────────────────────────────────────────────
 # One scheduler handles channel publishing. One long-poller handles Sell Bot
@@ -2005,7 +2049,7 @@ async def startup():
         except Exception as e:
             logger.warning(f"Xray apply on boot failed: {e}")
     log_activity("system", "سرور راه‌اندازی شد", "ok")
-    logger.info(f"Spider Panel v11 started on port {CONFIG['port']}")
+    logger.info(f"Spider Panel Ultra started on port {CONFIG['port']}")
     # Include XHTTP router for xhttp-siz10 endpoints (already merged into main.py)
     global xhttp_router
     # router is already defined in this module
@@ -5281,9 +5325,23 @@ async def delete_link(uid: str, _=Depends(require_auth)):
     return {"ok": True, "deleted": uid}
 
 
+# WebSocket relay path used by Vercel TLS+WS configs. The UUID is still the
+# managed link ID; validation/accounting happens in the shared tunnel handler.
+@app.websocket("/ws/vl/{uuid}")
+async def ws_vl_uuid_handler(ws: WebSocket, uuid: str):
+    # Vercel's deploy-time health probe verifies a real WS upgrade to Railway.
+    # It uses a reserved non-UUID path and never opens a target TCP connection.
+    if uuid == "__health":
+        await ws.accept()
+        await ws.send_text("SpiderPanel WS health ok")
+        await ws.close(code=1000, reason="health check")
+        return
+    await websocket_tunnel(ws, uuid, expected_relay_inbound_id=find_default_tls_ws_inbound_id())
+
+
 # WebSocket route: /ws/{uuid} — config_uuid IS the path.
 # Registered directly (like the RVG reference) so it is never swallowed by a
-# try/except — this is the only route serving WS TLS configs.
+# try/except — this is the normal WS TLS path; /ws/vl/{uuid} is the Vercel alias.
 @app.websocket("/ws/{uuid}")
 async def ws_uuid_handler(ws: WebSocket, uuid: str):
     # /ws/live is registered later — handle it here since param route matches first
@@ -9028,10 +9086,11 @@ def _req_client_ip(request: Request) -> str:
 
 async def _open_tcp_from_header(first_chunk: bytes, uuid: str = "", proxy_override: str = ""):
     command, address, port, payload = await parse_vless_header(first_chunk, uuid)
-    # Route outbound through the user's proxy IP (same as WS relay).
-    # proxy_connect is in main.py
+    # Route outbound through the same proxy selection pipeline as the WS relay.
+    # The helper is named ``proxy_connect`` in this single-file application;
+    # ``_proxy_connect`` does not exist and caused every XHTTP POST to return 502.
     reader, writer = await asyncio.wait_for(
-        _proxy_connect(uuid, address, port, proxy_override=proxy_override or None),
+        proxy_connect(uuid, address, port, proxy_override=proxy_override or None),
         timeout=TCP_CONNECT_TIMEOUT,
     )
     _tune_socket(writer)
@@ -9073,7 +9132,10 @@ async def _get_or_create_session(uuid: str, mode: str, session_id: str, ip: str 
     همچنین IP واقعی کانفیگ را در USER_IP_MAP ثبت می‌کند و در صورت رسیدن
     کاربر به حداکثر IPهای مجاز، ارتباط را رد می‌کند.
     """
-    # using inline functions from main
+    # This XHTTP implementation was merged into main.py from a module that
+    # used a module alias named `m`. Resolve the active module explicitly here
+    # so the check uses this running SpiderPanel instance.
+    m = _get_main()
     if not await m.enforce_ip_limit_for_link(uuid, ip):
         raise HTTPException(status_code=403, detail="ip limit reached")
     # Resolve before taking XHTTP_LOCK so we never nest LINKS/USERS under it.
@@ -9130,8 +9192,11 @@ async def _teardown(session_id: str):
         except Exception:
             pass
     connections.pop(sess.get("conn_id"), None)
-    # Release the IP so USER_IP_MAP reflects live concurrent connections
+    # Release the IP so USER_IP_MAP reflects live concurrent connections.
+    # Resolve the active app module: `m` was a module alias in the original
+    # standalone XHTTP module and must not be assumed to exist after merging.
     try:
+        m = _get_main()
         asyncio.create_task(m.release_ip_for_link(sess.get("uuid", ""), sess.get("ip", "")))
     except Exception:
         pass
@@ -9323,6 +9388,11 @@ async def stream_up_upload(uuid: str, session_id: str, request: Request):
 
     conn = connections[sess["conn_id"]]   # یک بار لوک‌آپ، نه هر چانک
     writer = sess["writer"]               # ممکنه هنوز None باشه
+    # Buffer only until the complete VLESS header is available. Proxies such
+    # as Vercel can split a single streamed POST into small arbitrary chunks;
+    # parse_vless_header must not assume the first ASGI chunk is a full header.
+    header_buffer = bytearray()
+    max_header_buffer = 4096
 
     try:
         async for chunk in request.stream():
@@ -9341,7 +9411,18 @@ async def stream_up_upload(uuid: str, session_id: str, request: Request):
             conn["bytes"] += len(chunk)
 
             if writer is None:
-                await _open_tcp_for_session(session_id, uuid, sess, chunk)
+                header_buffer.extend(chunk)
+                try:
+                    # Parse once to determine whether we have the full header.
+                    # _open_tcp_for_session parses again and forwards any bytes
+                    # following the header to the destination socket.
+                    await parse_vless_header(bytes(header_buffer), uuid)
+                except IncompleteVlessHeader:
+                    if len(header_buffer) > max_header_buffer:
+                        raise ValueError("VLESS header exceeded maximum buffered size")
+                    continue
+                await _open_tcp_for_session(session_id, uuid, sess, bytes(header_buffer))
+                header_buffer.clear()
                 writer = sess["writer"]
                 continue
 
@@ -9354,9 +9435,15 @@ async def stream_up_upload(uuid: str, session_id: str, request: Request):
         raise
     except Exception as exc:
         error_logs.append({"error": str(exc), "time": datetime.now().isoformat()})
+        logger.exception("XHTTP stream-up failed while opening/forwarding upload for session %s", session_id[:8])
         await gate.flush()
         await _teardown(session_id)
         raise HTTPException(status_code=502, detail="stream error")
+
+    if writer is None and header_buffer:
+        await gate.flush()
+        await _teardown(session_id)
+        raise HTTPException(status_code=400, detail="incomplete VLESS header in upload stream")
 
     await gate.flush()
     return {"ok": True}
@@ -9664,9 +9751,16 @@ def _ws_client_ip(ws: WebSocket) -> str:
         return real_ip.strip()
     return ws.client.host if ws.client else "نامشخص"
 
+class IncompleteVlessHeader(ValueError):
+    """The current XHTTP upload chunk ends before the complete VLESS header."""
+
+
 async def parse_vless_header(chunk: bytes, expected_uuid: str | None = None):
-    if len(chunk) < 24:
-        raise ValueError("chunk too small")
+    # XHTTP is carried over a streaming HTTP request. Reverse proxies are free
+    # to split the request body at arbitrary byte boundaries, so an initial
+    # chunk is not guaranteed to contain the entire VLESS header.
+    if len(chunk) < 18:
+        raise IncompleteVlessHeader("incomplete VLESS header: version/UUID/addon length")
 
     # The UUID is carried inside the VLESS request header. Validate it against
     # the UUID in /ws/{uuid} (or the XHTTP URL) so path/UUID can never diverge.
@@ -9681,17 +9775,29 @@ async def parse_vless_header(chunk: bytes, expected_uuid: str | None = None):
                 raise
             raise ValueError("invalid expected uuid") from exc
 
-    pos = 17
-    addon_len = chunk[pos]; pos += 1 + addon_len
+    addon_len = chunk[17]
+    pos = 18 + addon_len
+    if len(chunk) < pos + 1:
+        raise IncompleteVlessHeader("incomplete VLESS header: addons/command")
     command = chunk[pos]; pos += 1
+    if len(chunk) < pos + 3:
+        raise IncompleteVlessHeader("incomplete VLESS header: port/address type")
     port = int.from_bytes(chunk[pos:pos+2], "big"); pos += 2
     addr_type = chunk[pos]; pos += 1
     if addr_type == 1:
+        if len(chunk) < pos + 4:
+            raise IncompleteVlessHeader("incomplete VLESS header: IPv4 address")
         address = ".".join(str(b) for b in chunk[pos:pos+4]); pos += 4
     elif addr_type == 2:
+        if len(chunk) < pos + 1:
+            raise IncompleteVlessHeader("incomplete VLESS header: domain length")
         dlen = chunk[pos]; pos += 1
+        if len(chunk) < pos + dlen:
+            raise IncompleteVlessHeader("incomplete VLESS header: domain name")
         address = chunk[pos:pos+dlen].decode("utf-8", errors="ignore"); pos += dlen
     elif addr_type == 3:
+        if len(chunk) < pos + 16:
+            raise IncompleteVlessHeader("incomplete VLESS header: IPv6 address")
         ab = chunk[pos:pos+16]; pos += 16
         address = ":".join(f"{ab[i]:02x}{ab[i+1]:02x}" for i in range(0, 16, 2))
     else:
@@ -13239,6 +13345,180 @@ async def _sync_worker_proxies_from_source() -> dict:
             asyncio.create_task(save_state())
             logger.warning(f"worker proxy sync failed: {msg}")
             return {"ok": False, "error": msg}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Vercel Domain — TLS WebSocket clients -> Vercel WS bridge -> Railway WS relay
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _vercel_normalize_domain(raw: str) -> str:
+    value = str(raw or "").strip()
+    value = re.sub(r"^https?://", "", value, flags=re.I).split("/", 1)[0].split(":", 1)[0].lower().rstrip(".")
+    if not value or len(value) > 253 or "." not in value:
+        return ""
+    if not re.fullmatch(r"(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+", value):
+        return ""
+    return value
+
+
+def _vercel_config_for_user(user_id: str, user: dict, domain: str) -> str:
+    cfg_uuid = str(user.get("config_uuid") or user_id or "").strip()
+    if not _is_valid_uuid(cfg_uuid):
+        return ""
+    username = str(user.get("username") or user_id or "user").strip()[:80]
+    path = f"/ws/vl/{cfg_uuid}"
+    params = (
+        "encryption=none&security=tls&type=ws"
+        f"&host={quote(domain, safe='')}"
+        f"&path={quote(path, safe='')}"
+        f"&sni={quote(domain, safe='')}"
+        "&fp=chrome&alpn=http%2F1.1"
+    )
+    return f"vless://{cfg_uuid}@{domain}:443?{params}#{quote('Spider-' + username + ' Vercel', safe='')}"
+
+
+def _vercel_public() -> dict:
+    connected = bool(VERCEL.get("connected") and VERCEL.get("domain"))
+    domain = _vercel_normalize_domain(VERCEL.get("domain") or "") if connected else ""
+    legacy_protocol = bool(connected and VERCEL.get("legacy_protocol"))
+    configs = []
+    if domain and not legacy_protocol:
+        for uid, user in sorted(USERS.items(), key=lambda item: str((item[1].get("username") if isinstance(item[1], dict) else "") or item[0]).casefold()):
+            if not isinstance(user, dict):
+                continue
+            config = _vercel_config_for_user(str(uid), user, domain)
+            if config:
+                configs.append({
+                    "user_id": str(uid),
+                    "username": str(user.get("username") or uid),
+                    "active": str(user.get("status") or "active").lower() == "active",
+                    "config": config,
+                })
+    return {
+        "ok": True,
+        "connected": connected,
+        "domain": domain,
+        "url": str(VERCEL.get("url") or (f"https://{domain}" if domain else "")),
+        "target_domain": str(VERCEL.get("target_domain") or get_host() or ""),
+        "project_name": str(VERCEL.get("project_name") or ""),
+        "created_at": str(VERCEL.get("created_at") or ""),
+        "relay_path": "/ws/vl",
+        "protocol": "ws",
+        "legacy_protocol": legacy_protocol,
+        "last_error": str(VERCEL.get("last_error") or ""),
+        "configs": configs,
+    }
+
+
+@app.get("/api/system/vercel-domain")
+async def vercel_domain_status(_=Depends(require_auth)):
+    return _vercel_public()
+
+
+@app.post("/api/system/vercel-domain")
+async def vercel_domain_deploy(request: Request, _=Depends(require_auth)):
+    body = await request.json()
+    token = str(body.get("token") or "").strip()
+    if not token or len(token) > 4096:
+        raise HTTPException(status_code=400, detail="A valid Vercel token is required")
+
+    target_domain = _vercel_normalize_domain(get_host())
+    if not target_domain:
+        raise HTTPException(status_code=400, detail="The public Railway panel domain could not be detected yet")
+
+    async with VERCEL_LOCK:
+        if VERCEL.get("connected") or VERCEL.get("deploying"):
+            raise HTTPException(status_code=409, detail="A Vercel domain is already connected or is being deployed. Delete it before creating another one.")
+        VERCEL["last_error"] = ""
+        VERCEL["deploying"] = True
+
+    project_name = "spider-ws-" + secrets.token_hex(4)
+    relay_path = "/ws/vl"
+    deployed_attempted = False
+    try:
+        await verify_vercel_token(token)
+        deployed_attempted = True
+        result = await deploy_to_vercel(
+            token=token,
+            project_name=project_name,
+            target_domain=target_domain,
+            relay_path=relay_path,
+            public_path=relay_path,
+        )
+        domain = _vercel_normalize_domain(result.get("domain") or result.get("url") or "")
+        if not domain:
+            raise VercelError("Vercel deployed the project but returned an invalid public domain")
+        async with VERCEL_LOCK:
+            VERCEL.update({
+                "connected": True,
+                "deploying": False,
+                "token": token,
+                "project_name": project_name,
+                "domain": domain,
+                "url": f"https://{domain}",
+                "target_domain": target_domain,
+                "deploy_id": str(result.get("deploy_id") or ""),
+                "project_id": str(result.get("project_id") or ""),
+                "relay_path": relay_path,
+                "public_path": relay_path,
+                "protocol": "ws",
+                "legacy_protocol": False,
+                "created_at": now_ir().isoformat(timespec="seconds"),
+                "last_error": "",
+            })
+        await save_state()
+        return _vercel_public()
+    except VercelError as exc:
+        # If Vercel created the project but deployment failed, make a best effort
+        # to clean up the randomly named project before returning the error.
+        if deployed_attempted:
+            try:
+                await delete_vercel_project(token, project_name)
+            except Exception:
+                logger.warning("Vercel cleanup after failed deploy did not complete", exc_info=True)
+        async with VERCEL_LOCK:
+            VERCEL["deploying"] = False
+            VERCEL["last_error"] = str(exc)[:500]
+        await save_state()
+        status = 400 if "token rejected" in str(exc).lower() else 502
+        raise HTTPException(status_code=status, detail=str(exc))
+    except HTTPException:
+        async with VERCEL_LOCK:
+            VERCEL["deploying"] = False
+        await save_state()
+        raise
+    except Exception as exc:
+        logger.exception("Unexpected Vercel deploy error")
+        async with VERCEL_LOCK:
+            VERCEL["deploying"] = False
+            VERCEL["last_error"] = "Vercel deployment failed. Check the token permissions and try again."
+        await save_state()
+        raise HTTPException(status_code=502, detail="Vercel deployment failed. Check the token permissions and try again.") from exc
+
+
+@app.delete("/api/system/vercel-domain")
+async def vercel_domain_delete(_=Depends(require_auth)):
+    async with VERCEL_LOCK:
+        token = str(VERCEL.get("token") or "")
+        project_name = str(VERCEL.get("project_name") or "")
+        connected = bool(VERCEL.get("connected") and token and project_name)
+    if not connected:
+        raise HTTPException(status_code=400, detail="No Vercel domain is connected")
+    try:
+        await delete_vercel_project(token, project_name)
+    except VercelError as exc:
+        async with VERCEL_LOCK:
+            VERCEL["last_error"] = str(exc)[:500]
+        await save_state()
+        raise HTTPException(status_code=502, detail=str(exc))
+    async with VERCEL_LOCK:
+        VERCEL.update({
+            "connected": False, "deploying": False, "token": "", "project_name": "", "domain": "", "url": "",
+            "target_domain": "", "deploy_id": "", "project_id": "", "created_at": "", "last_error": "",
+            "relay_path": "/ws/vl", "public_path": "/ws/vl", "protocol": "ws", "legacy_protocol": False,
+        })
+    await save_state()
+    return _vercel_public()
 
 
 @app.get("/api/worker")
