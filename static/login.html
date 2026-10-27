@@ -235,6 +235,10 @@ body {
     gap: 8px;
 }
 .error-msg.show { display: flex; }
+.error-msg.show { animation: loginErrorIn .42s cubic-bezier(.22,1,.36,1) both; }
+@keyframes loginErrorIn { 0%{opacity:0;transform:translateY(-7px);filter:blur(3px)} 65%{opacity:1;transform:translateY(1px);filter:blur(0)} 100%{opacity:1;transform:none} }
+.glass-card.login-success-out { animation: loginSuccessOut .22s ease both; }
+@keyframes loginSuccessOut { to{opacity:0;transform:translateY(-5px) scale(.985);filter:blur(4px)} }
 
 /* رفتار اختصاصی نسخه موبایل */
 @media (max-width: 768px) {
@@ -342,6 +346,29 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 <script>
 var passwordInput = document.getElementById('password');
 var passwordMask = document.getElementById('password-mask');
+var loginAudioContext = null;
+function loginTone(kind) {
+    try {
+        var AudioCtor = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtor) return;
+        if (!loginAudioContext) loginAudioContext = new AudioCtor();
+        if (loginAudioContext.state === 'suspended') loginAudioContext.resume().catch(function(){});
+        if (kind === 'unlock') return;
+        var notes = kind === 'success' ? [[660,0,.11],[880,.09,.16]] : [[330,0,.12],[220,.11,.18]];
+        notes.forEach(function(note) {
+            var osc = loginAudioContext.createOscillator();
+            var gain = loginAudioContext.createGain();
+            var start = loginAudioContext.currentTime + note[1];
+            osc.type = kind === 'success' ? 'sine' : 'triangle';
+            osc.frequency.setValueAtTime(note[0], start);
+            gain.gain.setValueAtTime(.0001, start);
+            gain.gain.linearRampToValueAtTime(.036, start + .012);
+            gain.gain.exponentialRampToValueAtTime(.0001, start + note[2]);
+            osc.connect(gain); gain.connect(loginAudioContext.destination);
+            osc.start(start); osc.stop(start + note[2] + .015);
+        });
+    } catch (_) {}
+}
 function syncPasswordMask() {
     if (passwordInput && passwordMask) passwordMask.textContent = '*'.repeat(passwordInput.value.length);
 }
@@ -351,6 +378,7 @@ setTimeout(syncPasswordMask, 0);
 
 document.getElementById('login-form').addEventListener('submit', async function(e) {
     e.preventDefault();
+    loginTone('unlock');
     var btn = document.getElementById('loginBtn');
     var btnText = document.getElementById('btn-text');
     var btnSpinner = document.getElementById('btn-spinner');
@@ -372,8 +400,14 @@ document.getElementById('login-form').addEventListener('submit', async function(
             var d = await r.json().catch(function() { return {}; });
             throw new Error(d.detail || 'Login failed');
         }
-        location.href = '/spider';
+        loginTone('success');
+        // Keep the visual transition optional: an absent animation target must
+        // never turn a successful authentication response into a login error.
+        var loginCard = document.querySelector('.glass-card');
+        if (loginCard) loginCard.classList.add('login-success-out');
+        setTimeout(function() { location.href = '/spider'; }, 240);
     } catch(ex) {
+        loginTone('error');
         errText.textContent = ex.message;
         errDiv.classList.add('show');
         btn.disabled = false;
