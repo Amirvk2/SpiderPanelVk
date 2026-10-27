@@ -650,23 +650,6 @@ body[data-tab="tab-configs"] .site-foot { display: none; }
   .water-waves .wave-2{ animation:none; }
 }
 
-.import-card{margin:16px 0;display:flex;flex-direction:column;gap:12px;contain:layout style}
-.import-title{font-size:13px;font-weight:800;display:flex;align-items:center;gap:8px;color:var(--bright3)}
-:root:not([data-theme=dark]) .import-title{color:var(--bright)}
-.import-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.import-btn{
-  display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;border-radius:13px;
-  color:var(--btn-white-text);text-decoration:none;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;
-  background:var(--btn-white-bg);
-  border:1px solid var(--btn-white-border);
-  box-shadow:var(--btn-white-shadow);
-  transition:transform .25s cubic-bezier(.16,1,.3,1);
-  position:relative;overflow:hidden;
-  contain:layout style paint;
-}
-.import-btn:hover{transform:translateY(-2px)}
-.import-btn i{font-size:15px;color:var(--btn-icon-color)}
-
 .account-card{margin:16px 0;contain:layout style}
 .account-title{
   font-size:13px;font-weight:800;
@@ -1493,7 +1476,7 @@ button,
 @keyframes sxNav{from{translate:0 30px}}
 
 /* ---- بلوک‌های اصلی ---- */
-.hero-bar,.badge-row,.merged-block,.import-card,.account-card,.expire-card,
+.hero-bar,.badge-row,.merged-block,.account-card,.expire-card,
 .social-section,.team-brand,.site-foot{
   animation:
     sxFade 950ms var(--sx-ease-fade) var(--sx-d,0ms) backwards,
@@ -1502,7 +1485,6 @@ button,
 .hero-bar{--sx-from:translate3d(0,-18px,0) scale(.985);--sx-d:0ms}
 .badge-row{--sx-from:translate3d(0,14px,0) scale(.97);--sx-d:90ms}
 .merged-block{--sx-from:translate3d(0,34px,0) scale(.965);--sx-d:170ms}
-.import-card{--sx-from:translate3d(0,26px,0) scale(.975);--sx-d:300ms}
 .account-card{--sx-from:translate3d(0,26px,0) scale(.975);--sx-d:370ms}
 .expire-card{--sx-from:translate3d(0,26px,0) scale(.975);--sx-d:440ms}
 .social-section{--sx-from:translate3d(0,16px,0);--sx-d:510ms}
@@ -1511,7 +1493,7 @@ button,
 
 /* ---- موج ریز داخل بلوک‌ها (بعد از ورود خود بلوک، یکی‌یکی) ---- */
 .hero-top,.brand-center,.badge-row>*,.fluffy-stat,.fluffy-bar-wrap,.fluffy-days,
-.import-btn,.account-row,.expire-box,.social-card,.nav-item{
+.account-row,.expire-box,.social-card,.nav-item{
   animation:
     sxFade 700ms var(--sx-ease-fade) var(--sx-d,0ms) backwards,
     sxMove 1100ms var(--sx-ease-move) var(--sx-d,0ms) backwards;
@@ -1530,9 +1512,6 @@ button,
 .fluffy-stat:nth-child(6){--sx-d:725ms}
 .fluffy-bar-wrap{--sx-from:translate3d(0,12px,0);--sx-d:780ms}
 .fluffy-days{--sx-from:translate3d(0,12px,0);--sx-d:840ms}
-.import-btn{--sx-from:translate3d(0,12px,0) scale(.94)}
-.import-btn:nth-child(1){--sx-d:520ms}
-.import-btn:nth-child(2){--sx-d:600ms}
 .account-row{--sx-from:translate3d(0,10px,0)}
 .account-row:nth-child(1){--sx-d:580ms}
 .account-row:nth-child(2){--sx-d:645ms}
@@ -1558,10 +1537,10 @@ button,
 }
 
 @media (prefers-reduced-motion: reduce){
-  .hero-bar,.badge-row,.merged-block,.import-card,.account-card,.expire-card,
+  .hero-bar,.badge-row,.merged-block,.account-card,.expire-card,
   .social-section,.team-brand,.site-foot,.bottom-nav,
   .hero-top,.brand-center,.badge-row>*,.fluffy-stat,.fluffy-bar-wrap,.fluffy-days,
-  .import-btn,.account-row,.expire-box,.social-card,.nav-item{animation:none}
+  .account-row,.expire-box,.social-card,.nav-item{animation:none}
 }
 </style>
 
@@ -2604,7 +2583,7 @@ html.theme-transition *::after{
     fa: {
       title:"ایستگاه فضایی اشتراک", statusOnline:"آنلاین", followUs:"ما را دنبال کنید",
       subLabel:"لینک سابسکریپشن", copyLink:"کپی لینک", accountTitle:"اطلاعات اکانت",
-      sId:"شناسه اشتراک", dlExact:"دانلود", ulExact:"آپلود", totalLimit:"حجم سرویس",
+      sId:"شناسه اشتراک", totalLimit:"حجم سرویس",
       usernameLbl:"نام کاربری", connLimit:"اتصال مجاز", connActive:"اتصال فعلی",
       usage:"مصرف شده", remain:"حجم باقی‌مانده", used:"حجم مصرفی", unlimited:"∞ نامحدود",
       noExpire:"بدون تاریخ انقضا", min:"دقیقه", hour:"ساعت", day:"روز",
@@ -2614,14 +2593,14 @@ html.theme-transition *::after{
       toastCfg:"کانفیگ کپی شد", toastId:"شناسه کپی شد",
       toastErr:"خطا در کپی", connectedActive:"متصل و فعال",
       secureReady:"اتصال امن شما آماده استفاده است", quickConnect:"اتصال سریع",
-      quickImport:"اتصال سریع", qcTitle:"اتصال سریع با یک کلیک", themeLight:"روز", themeDark:"شب", usageChart:"نمودار مصرف",
+      qcTitle:"اتصال سریع با یک کلیک", themeLight:"روز", themeDark:"شب", usageChart:"نمودار مصرف",
       noConfig:"کانفیگی موجود نیست", gb:"گیگابایت", dailyAvg:"میانگین روزانه",
       navHome:"داشبورد", navConfigs:"کانفیگ‌ها"
     },
     en: {
       title:"Space Subscription Station", statusOnline:"Online", followUs:"Follow us",
       subLabel:"Subscription Link", copyLink:"Copy Link", accountTitle:"Account Info",
-      sId:"Subscription ID", dlExact:"Download", ulExact:"Upload", totalLimit:"Service Limit",
+      sId:"Subscription ID", totalLimit:"Service Limit",
       usernameLbl:"Username", connLimit:"Allowed Connections", connActive:"Active Connections",
       usage:"Used", remain:"Remaining", used:"Used", unlimited:"∞ Unlimited",
       noExpire:"No expiration date", min:"Min", hour:"Hour", day:"Day",
@@ -2631,7 +2610,7 @@ html.theme-transition *::after{
       toastCfg:"Config copied", toastId:"ID copied",
       toastErr:"Copy failed", connectedActive:"Connected & Active",
       secureReady:"Your secure connection is ready", quickConnect:"Quick Connect",
-      quickImport:"Quick Connect", qcTitle:"One-Tap Quick Connect", themeLight:"Light", themeDark:"Dark", usageChart:"Usage Chart",
+      qcTitle:"One-Tap Quick Connect", themeLight:"Light", themeDark:"Dark", usageChart:"Usage Chart",
       noConfig:"No configs", gb:"GB", dailyAvg:"Daily Avg",
       navHome:"Home", navConfigs:"Configs"
     }

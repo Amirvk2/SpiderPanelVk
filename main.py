@@ -3107,8 +3107,10 @@ def is_link_expired(link: dict) -> bool:
     if not exp:
         return False
     try:
-        return datetime.now() > datetime.fromisoformat(exp)
-    except Exception:
+        expires_at = datetime.fromisoformat(str(exp))
+        now = datetime.now(expires_at.tzinfo) if expires_at.tzinfo else datetime.now()
+        return now > expires_at
+    except (TypeError, ValueError, OverflowError):
         return False
 
 def is_link_allowed(link: dict | None) -> bool:
@@ -4190,7 +4192,7 @@ async def _build_subscription_data_by_uuid(config_uuid: str):
     uid, user = await _find_user_by_config_uuid(config_uuid)
     if not user:
         async with LINKS_LOCK:
-            link = LINKS.get(config_uuid)
+            link = dict(LINKS.get(config_uuid) or {})
         if link and is_link_allowed(link):
             host = SETTINGS.get("domain") or get_host()
             proto = link.get("protocol", DEFAULT_PROTOCOL)
@@ -4200,6 +4202,31 @@ async def _build_subscription_data_by_uuid(config_uuid: str):
                 remark=f"Spider-{link['label']}",
                 protocol=proto,
             )
+
+            # Raw links use the link's own timestamps and the panel-wide IP
+            # limit. Include them in the public page data too, otherwise the
+            # daily average, expiry header and connection-limit tile would
+            # fall back to misleading defaults for this account type.
+            created_at_ts = None
+            created_at = link.get("created_at")
+            if created_at:
+                try:
+                    created_at_ts = int(datetime.fromisoformat(str(created_at)).timestamp())
+                except (TypeError, ValueError, OverflowError):
+                    pass
+
+            expires_at = link.get("expires_at")
+            expire_at_ts = None
+            expire_days = None
+            if expires_at:
+                try:
+                    exp = datetime.fromisoformat(str(expires_at))
+                    now = datetime.now(exp.tzinfo) if exp.tzinfo else datetime.now()
+                    expire_at_ts = int(exp.timestamp())
+                    expire_days = max(0, (exp - now).days)
+                except (TypeError, ValueError, OverflowError):
+                    pass
+
             return {
                 "username": link.get("label", config_uuid),
                 "config_uuid": config_uuid,
@@ -4207,10 +4234,17 @@ async def _build_subscription_data_by_uuid(config_uuid: str):
                 "config": vless,
                 "status": "active",
                 "is_active": True,
-                "traffic_used_bytes": link.get("used_bytes", 0),
-                "traffic_limit_bytes": link.get("limit_bytes", 0),
-                "traffic_used_fmt": fmt_bytes(link.get("used_bytes", 0)),
-                "traffic_limit_fmt": "∞" if link.get("limit_bytes", 0) == 0 else fmt_bytes(link.get("limit_bytes", 0)),
+                "traffic_used_bytes": int(link.get("used_bytes", 0) or 0),
+                "traffic_limit_bytes": int(link.get("limit_bytes", 0) or 0),
+                "traffic_used_fmt": fmt_bytes(int(link.get("used_bytes", 0) or 0)),
+                "traffic_limit_fmt": "∞" if not link.get("limit_bytes", 0) else fmt_bytes(int(link.get("limit_bytes", 0) or 0)),
+                "created_at": created_at,
+                "created_at_ts": created_at_ts,
+                "expire_at": expires_at,
+                "expire_at_ts": expire_at_ts,
+                "expire_days": expire_days,
+                "max_ip_per_user": int(SETTINGS.get("max_ip_per_user", 3) if SETTINGS.get("max_ip_per_user") is not None else 3),
+                "used_ips": len(USER_IP_MAP.get(f"link:{config_uuid}", set())),
                 "inbound_ids": [],
                 "path": "",
                 "sni": "",
@@ -4230,10 +4264,11 @@ async def _build_subscription_data_by_uuid(config_uuid: str):
     expire_at_ts = None
     if user.get("expire_at"):
         try:
-            exp = datetime.fromisoformat(user["expire_at"])
+            exp = datetime.fromisoformat(str(user["expire_at"]))
+            now = datetime.now(exp.tzinfo) if exp.tzinfo else datetime.now()
             expire_at_ts = int(exp.timestamp())
-            expire_days = max(0, (exp - datetime.now()).days)
-        except Exception:
+            expire_days = max(0, (exp - now).days)
+        except (TypeError, ValueError, OverflowError):
             pass
 
     created_at_ts = None
@@ -4255,10 +4290,12 @@ async def _build_subscription_data_by_uuid(config_uuid: str):
         _exp = user.get("expire_at")
         if _exp:
             try:
-                if datetime.now() > datetime.fromisoformat(_exp):
+                _exp_dt = datetime.fromisoformat(str(_exp))
+                _now_dt = datetime.now(_exp_dt.tzinfo) if _exp_dt.tzinfo else datetime.now()
+                if _now_dt > _exp_dt:
                     status = "expired"
                     user["status"] = "expired"
-            except Exception:
+            except (TypeError, ValueError, OverflowError):
                 pass
         if status == "active":
             _lb = user.get("traffic_limit_bytes", 0)
