@@ -2353,16 +2353,12 @@ html.theme-transition *::after{
             <span class="fluffy-stat-lbl"><i class="fa-solid fa-database"></i> <span data-i18n="totalLimit">حجم سرویس</span></span>
           </div>
           <div class="fluffy-stat">
-            <span class="fluffy-stat-val" id="dlVal">0 GB</span>
-            <span class="fluffy-stat-lbl"><i class="fa-solid fa-arrow-down"></i> <span data-i18n="dlExact">دانلود</span></span>
-          </div>
-          <div class="fluffy-stat">
-            <span class="fluffy-stat-val" id="ulVal">0 GB</span>
-            <span class="fluffy-stat-lbl"><i class="fa-solid fa-arrow-up"></i> <span data-i18n="ulExact">آپلود</span></span>
-          </div>
-          <div class="fluffy-stat">
             <span class="fluffy-stat-val" id="avgVal">0 GB</span>
             <span class="fluffy-stat-lbl"><i class="fa-solid fa-calendar-day"></i> <span data-i18n="dailyAvg">میانگین روزانه</span></span>
+          </div>
+          <div class="fluffy-stat">
+            <span class="fluffy-stat-val" id="connLimitVal2">∞</span>
+            <span class="fluffy-stat-lbl"><i class="fa-solid fa-users"></i> <span data-i18n="connLimit">اتصال مجاز</span></span>
           </div>
         </div>
 
@@ -2401,17 +2397,6 @@ html.theme-transition *::after{
         </div>
       </div>
 
-    </div>
-
-    <div class="card import-card">
-      <div class="import-title">
-        <i class="fa-solid fa-bolt"></i>
-        <span data-i18n="quickImport">اتصال سریع</span>
-      </div>
-      <div class="import-btns">
-        <button type="button" id="btnImportV2ray" class="import-btn"><i class="fa-solid fa-shield-halved"></i> v2rayNG</button>
-        <button type="button" id="btnImportNpv" class="import-btn"><i class="fa-solid fa-rocket"></i> NPV</button>
-      </div>
     </div>
 
     <div class="card account-card">
@@ -2609,7 +2594,7 @@ html.theme-transition *::after{
 
   var CONFIG_LINKS = [], CONFIG_NAMES = [], CONFIG_PROTOS = [];
   var SUB_URL = '', SUB_ID = '', IS_ACTIVE = false;
-  var TOTAL_BYTES = 0, USED_BYTES = 0, DOWNLOAD_BYTES = 0, UPLOAD_BYTES = 0;
+  var TOTAL_BYTES = 0, USED_BYTES = 0, CREATED_AT_TS = null;
   var EXPIRE_TS = null, EXPIRE_DAYS = null;
   var countdownInterval = null;
 
@@ -2800,7 +2785,7 @@ html.theme-transition *::after{
     return manual();
   }
   function getSubUrl(){
-    return SUB_URL || (window.location.origin + "/sub/" + (SUB_ID || uname));
+    return SUB_URL || (window.location.origin + "/link/" + (SUB_ID || uname));
   }
 
   function protoOf(link){
@@ -2953,8 +2938,7 @@ html.theme-transition *::after{
       { sel: ".hero-bar",       delay: 40  },
       { sel: ".badge-row",      delay: 140 },
       { sel: ".merged-block",   delay: 220 },
-      { sel: ".import-card",    delay: 380 },
-      { sel: ".account-card",   delay: 460 },
+      { sel: ".account-card",   delay: 380 },
       { sel: ".expire-card",    delay: 540 },
       { sel: ".social-section", delay: 620 },
       { sel: ".team-brand",     delay: 700 },
@@ -3410,10 +3394,11 @@ html.theme-transition *::after{
     document.getElementById("statUsed").textContent = fmtBytes(USED_BYTES);
     document.getElementById("statTotal").textContent = unlimited ? '∞' : fmtBytes(TOTAL_BYTES);
     document.getElementById("statRemain").textContent = unlimited ? '∞' : fmtBytes(remain);
-    document.getElementById("dlVal").textContent = fmtBytes(DOWNLOAD_BYTES);
-    document.getElementById("ulVal").textContent = fmtBytes(UPLOAD_BYTES);
 
-    var dayCount = EXPIRE_DAYS && EXPIRE_DAYS > 0 ? EXPIRE_DAYS : 30;
+    // Real daily average: used bytes ÷ days actually elapsed since the
+    // account was created (from the panel's own created_at), not a guess.
+    var elapsedMs = CREATED_AT_TS ? (Date.now() - CREATED_AT_TS) : 0;
+    var dayCount = Math.max(1, Math.ceil(elapsedMs / 86400000));
     var avg = USED_BYTES / dayCount;
     document.getElementById("avgVal").textContent = fmtBytes(avg);
 
@@ -3698,22 +3683,6 @@ html.theme-transition *::after{
         showQR(getSubUrl(), "Subscription");
       });
     }
-    var btnV2ray = document.getElementById("btnImportV2ray");
-    if (btnV2ray && !btnV2ray._bound){
-      btnV2ray._bound = true;
-      btnV2ray.addEventListener("click", function(){
-        copyText(getSubUrl()).then(function(){ showToast(tr("toastSub")); })
-          .catch(function(){ showToast(tr("toastErr"), true); });
-      });
-    }
-    var btnNpv = document.getElementById("btnImportNpv");
-    if (btnNpv && !btnNpv._bound){
-      btnNpv._bound = true;
-      btnNpv.addEventListener("click", function(){
-        copyText(getSubUrl()).then(function(){ showToast(tr("toastSub")); })
-          .catch(function(){ showToast(tr("toastErr"), true); });
-      });
-    }
     var copyAllBtn = document.getElementById("copyAllConfigsBtn");
     if (copyAllBtn && !copyAllBtn._bound){
       copyAllBtn._bound = true;
@@ -3819,7 +3788,7 @@ html.theme-transition *::after{
     CONFIG_PROTOS = cfgs.map(protoOf);
 
     SUB_ID = d.config_uuid || uname;
-    SUB_URL = window.location.origin + '/sub/' + SUB_ID;
+    SUB_URL = window.location.origin + '/link/' + SUB_ID;
     setText('subUrl', SUB_URL);
     setText('subId', SUB_ID);
 
@@ -3833,8 +3802,7 @@ html.theme-transition *::after{
 
     USED_BYTES = d.traffic_used_bytes || 0;
     TOTAL_BYTES = d.traffic_limit_bytes || 0;
-    DOWNLOAD_BYTES = d.download_bytes || (USED_BYTES * 0.63);
-    UPLOAD_BYTES = d.upload_bytes || (USED_BYTES * 0.37);
+    CREATED_AT_TS = d.created_at_ts ? d.created_at_ts * 1000 : null;
 
     var days = d.expire_days;
     EXPIRE_DAYS = (days !== null && days !== undefined) ? days : null;
@@ -3844,6 +3812,7 @@ html.theme-transition *::after{
     var maxConn = parseInt(d.max_ip_per_user, 10);
     if (isNaN(maxConn) || maxConn < 1) maxConn = 0;
     setText('connLimitVal', maxConn > 0 ? faDigits(maxConn) : '∞');
+    setText('connLimitVal2', maxConn > 0 ? faDigits(maxConn) : '∞');
     var usedIps = parseInt(d.used_ips, 10);
     if (isNaN(usedIps)) usedIps = 0;
     var connEl = document.getElementById('connActiveVal');
