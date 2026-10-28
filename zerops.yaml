@@ -1,0 +1,19 @@
+# Zerops build & runtime configuration for SpiderPanel
+# Official Zerops filename: zerops.yaml
+zerops:
+  - setup: app
+    build:
+      base: python@3.12
+      # Deploy the project files (main.py, static/, svg/, data/, etc.).
+      deployFiles: .
+      # Make requirements.txt available to the runtime preparation step.
+      addToRunPrepare:
+        - requirements.txt
+    run:
+      base: python@3.12
+      ports:
+        - port: 8080
+          httpSupport: true
+      prepareCommands:
+        - python3 -m pip install --ignore-installed -r requirements.txt
+      start: python3 -m uvicorn main:app --host 0.0.0.0 --port 8080
