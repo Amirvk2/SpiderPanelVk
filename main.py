@@ -2764,6 +2764,8 @@ def _is_panel_relay_inbound(iid: str, ib: dict | None) -> bool:
         return False
     if is_default_tls_ws_inbound(ib):
         return True
+    if str(ib.get("_managed_kind") or "") == "active_http":
+        return True
     if _tm.is_tm_inbound(ib):
         return True
     return str(ib.get("protocol") or "").lower() in ("tunnel", "reverse")
@@ -3436,6 +3438,12 @@ def generate_user_config(user_id: str, user: dict, inbound_id: str = None, addr:
         transport = "ws"
         security = "tls"
         tls_host = panel_domain
+    elif str((inbound or {}).get("_managed_kind") or "") == "active_http":
+        host = addr_ip or _safe_host(inbound.get("external_domain"), inbound.get("domain"))
+        port = addr_port or str(inbound.get("external_port") or 80)
+        transport = "ws"
+        security = "none"
+        tls_host = host
     else:
         inbound_domain = str((inbound or {}).get("external_domain") or (inbound or {}).get("domain") or "").strip()
         host = addr_ip or _safe_host(inbound_domain, SETTINGS.get("domain"), get_host())
@@ -3477,7 +3485,9 @@ def generate_user_config(user_id: str, user: dict, inbound_id: str = None, addr:
         # Only the exact default TLS+WS inbound may use /ws/{uuid}; other WS
         # inbounds keep their own configured path if present.
         configured_path = str((inbound or {}).get("path") or "").strip()
-        if is_default_tls_ws_inbound(inbound):
+        if str((inbound or {}).get("_managed_kind") or "") == "active_http":
+            ws_path = f"/ws/http/{config_uuid}"
+        elif is_default_tls_ws_inbound(inbound):
             path_template = str(((inbound or {}).get("ws_settings") or {}).get("path") or "/ws/{uuid}")
             ws_path = path_template.replace("{uuid}", config_uuid)
             if not ws_path.startswith("/"):
@@ -5431,6 +5441,16 @@ async def ws_vl_uuid_handler(ws: WebSocket, uuid: str):
     await websocket_tunnel(ws, uuid, expected_relay_inbound_id=find_default_tls_ws_inbound_id())
 
 
+@app.websocket("/ws/http/{uuid}")
+async def active_http_ws_handler(ws: WebSocket, uuid: str):
+    iid = next((key for key, ib in INBOUNDS.items()
+                if str(ib.get("_managed_kind") or "") == "active_http"), None)
+    if not iid or not SETTINGS.get("active_http_enabled"):
+        await ws.close(code=1008, reason="active HTTP relay disabled")
+        return
+    await websocket_tunnel(ws, uuid, expected_relay_inbound_id=iid)
+
+
 # WebSocket route: /ws/{uuid} — config_uuid IS the path.
 # Registered directly (like the RVG reference) so it is never swallowed by a
 # try/except — this is the normal WS TLS path; /ws/vl/{uuid} is the Vercel alias.
@@ -5741,7 +5761,7 @@ async def managed_ws_template_handler(ws: WebSocket, path: str):
         await websocket_tunnel(ws, px_match.group(2), expected_relay_inbound_id=proxy_inbound_id(px_match.group(1)))
         return
     for inbound_id, inbound in INBOUNDS.items():
-        if not is_default_tls_ws_inbound(inbound):
+        if not (is_default_tls_ws_inbound(inbound) or str(inbound.get("_managed_kind") or "") == "active_http"):
             continue
         template = str(((inbound.get("ws_settings") or {}).get("path") or "")).strip()
         if "{uuid}" not in template:
@@ -6091,6 +6111,8 @@ async def update_inbound(inbound_id: str, request: Request, _=Depends(require_au
         ib = INBOUNDS.get(inbound_id)
         if not ib:
             raise HTTPException(status_code=404, detail="inbound not found")
+        if str(ib.get("_managed_kind") or "") == "active_http":
+            raise HTTPException(status_code=400, detail="Active HTTP inbound is managed from Advanced settings")
         old_protocol = str(ib.get("protocol") or "").lower()
         if "name" in body:
             _nn = str(body["name"]).strip()[:60]
@@ -6424,6 +6446,8 @@ async def delete_inbound(inbound_id: str, _=Depends(require_auth)):
         ib = INBOUNDS.get(inbound_id)
         if not ib:
             raise HTTPException(status_code=404, detail="inbound not found")
+        if str(ib.get("_managed_kind") or "") == "active_http":
+            raise HTTPException(status_code=400, detail="Active HTTP inbound is managed from Advanced settings")
         if ib.get("proxy_managed"):
             raise HTTPException(status_code=400, detail="Proxy inbounds are managed from the Proxy tab")
         if is_web_proxy_inbound(ib):
@@ -7789,6 +7813,9 @@ async def get_help_settings(_=Depends(require_auth)):
             "spoof_enabled": bool(SETTINGS.get("default_tls_ws_spoof_enabled")),
             "spoof_sni": str(SETTINGS.get("default_tls_ws_spoof_sni") or _SPOOF_DEFAULT_SNI),
             "spoof_ip": str(SETTINGS.get("default_tls_ws_spoof_ip") or _SPOOF_DEFAULT_IP),
+            "active_http_enabled": bool(SETTINGS.get("active_http_enabled")),
+            "active_http_domain": str(SETTINGS.get("active_http_domain") or ""),
+            "active_http_port": int(SETTINGS.get("active_http_port") or 80),
         }
 
 
@@ -7809,6 +7836,21 @@ async def update_help_settings(request: Request, _=Depends(require_auth)):
         raise HTTPException(status_code=400, detail="Unknown address mode")
 
     async with SETTINGS_LOCK:
+        if "active_http_enabled" in body:
+            enable_active = bool(body["active_http_enabled"])
+            if enable_active:
+                domain_value = _safe_host(body.get("active_http_domain") or SETTINGS.get("active_http_domain"))
+                try:
+                    port_value = int(body.get("active_http_port") or SETTINGS.get("active_http_port") or 80)
+                except (TypeError, ValueError):
+                    raise HTTPException(status_code=400, detail="Active HTTP port must be between 1 and 65535")
+                if not domain_value:
+                    raise HTTPException(status_code=400, detail="Active HTTP domain is required")
+                if not 1 <= port_value <= 65535:
+                    raise HTTPException(status_code=400, detail="Active HTTP port must be between 1 and 65535")
+                SETTINGS["active_http_domain"] = domain_value
+                SETTINGS["active_http_port"] = port_value
+            SETTINGS["active_http_enabled"] = enable_active
         if address is not None:
             SETTINGS["default_tls_ws_address_override"] = address
             SETTINGS["default_tls_ws_address_mode"] = mode
@@ -7838,7 +7880,29 @@ async def update_help_settings(request: Request, _=Depends(require_auth)):
             "spoof_enabled": bool(SETTINGS.get("default_tls_ws_spoof_enabled")),
             "spoof_sni": str(SETTINGS.get("default_tls_ws_spoof_sni") or _SPOOF_DEFAULT_SNI),
             "spoof_ip": str(SETTINGS.get("default_tls_ws_spoof_ip") or _SPOOF_DEFAULT_IP),
+            "active_http_enabled": bool(SETTINGS.get("active_http_enabled")),
+            "active_http_domain": str(SETTINGS.get("active_http_domain") or ""),
+            "active_http_port": int(SETTINGS.get("active_http_port") or 80),
         }
+    await save_state()
+    async with INBOUNDS_LOCK:
+        active_iid = next((key for key, value in INBOUNDS.items()
+                           if str(value.get("_managed_kind") or "") == "active_http"), None)
+        if saved["active_http_enabled"]:
+            if not active_iid:
+                active_iid = "ActiveHTTP"
+                if active_iid in INBOUNDS:
+                    active_iid = "ActiveHTTP-" + secrets.token_hex(3)
+            INBOUNDS[active_iid] = {
+                "name": "Active HTTP", "system": True, "_managed_kind": "active_http",
+                "protocol": "vless", "inbound_type": "transport", "port": saved["active_http_port"],
+                "external_port": saved["active_http_port"], "domain": saved["active_http_domain"],
+                "external_domain": saved["active_http_domain"], "network": "ws", "security": "none",
+                "ws_settings": {"path": "/ws/http/{uuid}"},
+                "created_at": INBOUNDS.get(active_iid, {}).get("created_at") or datetime.now().isoformat(),
+            }
+        elif active_iid:
+            INBOUNDS.pop(active_iid, None)
     await save_state()
     return {"ok": True, **saved}
 
@@ -10020,6 +10084,7 @@ async def websocket_tunnel(ws: WebSocket, uuid: str, proxy_override: str = None,
                 relay_inbound_ids.append(expected_relay_inbound_id)
         expected_is_managed = bool(
             (expected_relay_inbound_id == default_relay_id and is_default_tls_ws_inbound(relay_inbound))
+            or str((relay_inbound or {}).get("_managed_kind") or "") == "active_http"
             or str((relay_inbound or {}).get("protocol") or "").lower() in ("tunnel", "reverse")
         )
         relay_allowed = bool(

@@ -2444,6 +2444,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
                   </div>
                   <button type="button" class="ios-switch" id="help-spoof-switch" role="switch" aria-checked="false" onclick="toggleHelpFeature('spoof',this)"></button>
                 </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--border)">
+                  <div style="flex:1;min-width:0">
+                    <strong data-i18n="helpActiveHttp">Active HTTP</strong>
+                    <div class="px-hint" data-i18n="helpActiveHttpHint">یک اینباند WS relay با مسیر /ws/http/{uuid} می‌سازد.</div>
+                    <div class="f-r" style="gap:8px;margin-top:8px">
+                      <div class="f-g" style="margin:0"><label data-i18n="helpActiveHttpDomain">دامنه</label><input id="help-active-http-domain" type="text" dir="ltr" placeholder="example.com"></div>
+                      <div class="f-g" style="margin:0"><label data-i18n="helpActiveHttpPort">Port</label><input id="help-active-http-port" type="number" min="1" max="65535" dir="ltr" placeholder="80"></div>
+                    </div>
+                  </div>
+                  <button type="button" class="ios-switch" id="help-active-http-switch" role="switch" aria-checked="false" onclick="toggleHelpFeature('active_http',this)"></button>
+                </div>
               </div>
             </div>
           </div>
@@ -2859,6 +2870,7 @@ var I18N = {
     'helpEchChoose': 'انتخاب ECH', 'helpEchPickerTitle': 'ECH List', 'helpEchPickerHint': 'یک مقدار را انتخاب کنید؛ با فعال کردن ECH همین مقدار در کانفیگ‌ها استفاده می‌شود.', 'helpEchPresetSaved': 'گزینه ECH ذخیره شد',
     'helpFeatureHint': 'این گزینه‌ها فقط به کانفیگ‌های اینباند پیش‌فرض TLS + WS افزوده می‌شوند.', 'helpEch': 'افزودن ECH', 'helpEchHint': 'پارامتر ECH را به کانفیگ‌های TLS + WS پیش‌فرض اضافه می‌کند.', 'helpFf': 'افزودن F+F', 'helpFfHint': 'مجموعه cipher و تنظیمات fragment نمونه را به کانفیگ‌های TLS + WS پیش‌فرض اضافه می‌کند و هنگام فعال بودن، fingerprint را روی unsafe می‌گذارد.',
     'helpSpoof': 'Spoof', 'helpSpoofHint': 'پارامتر snispoofing را به کانفیگ‌های TLS + WS پیش‌فرض اضافه می‌کند.', 'helpSpoofSni': 'SNI جعلی', 'helpSpoofIp': 'IP مقصد', 'helpSpoofMissing': 'برای فعال کردن Spoof، SNI و IP را وارد کنید', 'helpSpoofSaved': 'تنظیمات Spoof ذخیره شد',
+    'helpActiveHttp': 'Active HTTP', 'helpActiveHttpHint': 'یک اینباند خودکار WS relay با مسیر /ws/http/{uuid} می‌سازد.', 'helpActiveHttpDomain': 'دامنه', 'helpActiveHttpPort': 'پورت', 'helpActiveHttpMissing': 'دامنه و پورت معتبر وارد کنید', 'activeHttpManaged': 'اینباند خودکار است و قابل ویرایش نیست',
     'advancedInboundHint': 'یک اینباند را انتخاب کنید و JSON کامل آن را ویرایش کنید. تغییرات ذخیره و برای سرویس اعمال می‌شوند.', 'advancedSelectInbound': 'انتخاب اینباند', 'advancedChooseInbound': 'انتخاب کنید', 'advancedJson': 'JSON اینباند', 'advancedSave': 'ذخیره JSON', 'advancedSaved': 'JSON اینباند ذخیره شد', 'advancedInvalidJson': 'JSON معتبر نیست', 'advancedNoInbounds': 'اینباند قابل ویرایشی وجود ندارد', 'defaultTlsWsInbound': 'پیش‌فرض TLS + WS',
     'inboundFixedHint': 'فقط اینباندهای پیش‌فرض پنل استفاده می‌شوند. WS/TLS به‌صورت خودکار با دامنه اصلی پنل آماده است؛ Reality را با دامنه و پورت خودتان تکمیل کنید (کلید pbk به‌صورت خودکار ساخته می‌شود).', 'inboundFixed': 'افزودن اینباند غیرفعال است — فقط اینباندهای پیش‌فرض.', 'inboundAuto': 'این اینباند خودکار است و نیازی به تنظیم ندارد.',
     'newUser': 'کاربر جدید', 'newInbound': 'اینباند جدید', 'domain': 'دامنه',
@@ -2928,6 +2940,7 @@ var I18N = {
     'helpEchChoose': 'Choose ECH', 'helpEchPickerTitle': 'ECH List', 'helpEchPickerHint': 'Choose a value; enabling ECH will use this value in generated configs.', 'helpEchPresetSaved': 'ECH preset saved',
     'helpFeatureHint': 'These options are added only to configs from the default TLS + WS inbound.', 'helpEch': 'Add ECH', 'helpEchHint': 'Adds the ECH parameter to default TLS + WS configs.', 'helpFf': 'Add F+F', 'helpFfHint': 'Adds the sample cipher suite and fragmentation parameters to default TLS + WS configs, and sets the fingerprint to unsafe while it is on.',
     'helpSpoof': 'Spoof', 'helpSpoofHint': 'Adds the snispoofing parameter to default TLS + WS configs.', 'helpSpoofSni': 'Fake SNI', 'helpSpoofIp': 'Target IP', 'helpSpoofMissing': 'Enter the SNI and IP to enable Spoof', 'helpSpoofSaved': 'Spoof settings saved',
+    'helpActiveHttp': 'Active HTTP', 'helpActiveHttpHint': 'Creates an automatic WS relay inbound with path /ws/http/{uuid}.', 'helpActiveHttpDomain': 'Domain', 'helpActiveHttpPort': 'Port', 'helpActiveHttpMissing': 'Enter a valid domain and port', 'activeHttpManaged': 'Automatically managed inbound; editing is disabled',
     'advancedInboundHint': 'Select an inbound and edit its full JSON. Changes are saved and applied to the service.', 'advancedSelectInbound': 'Select inbound', 'advancedChooseInbound': 'Choose an inbound', 'advancedJson': 'Inbound JSON', 'advancedSave': 'Save JSON', 'advancedSaved': 'Inbound JSON saved', 'advancedInvalidJson': 'Invalid JSON', 'advancedNoInbounds': 'No editable inbounds', 'defaultTlsWsInbound': 'Default TLS + WS',
     'inboundFixedHint': 'Only the panel’s default inbounds are used. WS/TLS is ready automatically with the panel’s main domain; fill Reality’s domain & ports yourself (pbk is auto-generated).', 'inboundFixed': 'Adding inbounds is disabled — only the default inbounds.', 'inboundAuto': 'This inbound is automatic — nothing to configure.',
     'newUser': 'New User', 'newInbound': 'New Inbound', 'domain': 'Domain',
@@ -4519,6 +4532,9 @@ function _ibDetail(ib) {
   } else if (ib.protocol === 'reality' || ib.security === 'reality') {
     d += t('domain') + ': ' + (ib.external_domain || '—') + '<br>';
     d += t('port') + ': ' + (ib.port || '—');
+  } else if (ib._managed_kind === 'active_http') {
+    d += t('domain') + ': ' + (ib.external_domain || ib.domain || '—') + '<br>';
+    d += t('port') + ': ' + (ib.external_port || ib.port || '80') + '<br>' + t('activeHttpManaged');
   } else {
     d += t('domain') + ': ' + (ib.external_domain || '—') + ' (خودکار)<br>';
     d += t('port') + ': 443 / relay';
@@ -4559,10 +4575,10 @@ function renderInbounds() {
               '<button class="btn btn-sm btn-g" onclick="setWebProxyEnabled(\'' + ib.inbound_id + '\',true)">' + t('wpEnable') + '</button>' :
               '<button class="btn btn-sm btn-g" onclick="setWebProxyEnabled(\'' + ib.inbound_id + '\',false)">' + t('wpDisable') + '</button>') +
           '</div>' :
-          '<div class="spd-acc-btns">' +
+          (ib._managed_kind === 'active_http' ? '<div class="spd-acc-btns"><span style="font-size:10px;opacity:.6">' + esc(t('activeHttpManaged')) + '</span></div>' : '<div class="spd-acc-btns">' +
           '<button class="btn btn-sm btn-g" onclick="editInbound(\'' + ib.inbound_id + '\')">' + t('edit') + '</button>' +
           ((ib.system || ib.inbound_id === 'Node') ? '' : '<button class="btn btn-sm btn-g" onclick="deleteInbound(\'' + ib.inbound_id + '\')">' + t('delete') + '</button>') +
-        '</div>') +
+        '</div>')) +
       '</div>' +
     '</div>';
   }
@@ -5120,6 +5136,9 @@ async function loadHelpSettings() {
     _setHelpSwitch('help-spoof-switch', s.spoof_enabled);
     if ($id('help-spoof-sni')) $id('help-spoof-sni').value = s.spoof_sni || '';
     if ($id('help-spoof-ip')) $id('help-spoof-ip').value = s.spoof_ip || '';
+    _setHelpSwitch('help-active-http-switch', s.active_http_enabled);
+    if ($id('help-active-http-domain')) $id('help-active-http-domain').value = s.active_http_domain || '';
+    if ($id('help-active-http-port')) $id('help-active-http-port').value = s.active_http_port || 80;
   } catch(e) { toast(e.message || t('toast.err'), 'err'); }
 }
 
@@ -5147,11 +5166,20 @@ async function toggleHelpFeature(feature, el) {
     var ok = await saveHelpSpoofFields();
     if (!ok) { toast(t('helpSpoofMissing'), 'err'); return; }
   }
+  var activeHttpDomain = '', activeHttpPort = '';
+  if (feature === 'active_http' && enabled) {
+    activeHttpDomain = ($id('help-active-http-domain').value || '').trim();
+    activeHttpPort = parseInt($id('help-active-http-port').value, 10);
+    if (!activeHttpDomain || !Number.isInteger(activeHttpPort) || activeHttpPort < 1 || activeHttpPort > 65535) {
+      toast(t('helpActiveHttpMissing'), 'err'); return;
+    }
+  }
   _setHelpSwitch(el.id, enabled);
   var body = {};
   if (feature === 'ech') { body.ech_enabled = enabled; }
   else if (feature === 'ff') { body.ff_enabled = enabled; }
   else if (feature === 'spoof') { body.spoof_enabled = enabled; }
+  else if (feature === 'active_http') { body.active_http_enabled = enabled; if (enabled) { body.active_http_domain = activeHttpDomain; body.active_http_port = activeHttpPort; } }
   try {
     await api('/api/help/settings', {method: 'POST', body: body});
     toast(t('helpSettingsSaved'), 'ok');
